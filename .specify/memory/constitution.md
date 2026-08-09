@@ -1,50 +1,187 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report
+==================
+- Version change: template (sin versión) → 1.0.0
+- Ratificación inicial: se reemplaza el template completo por la constitución de Vokara.
+- Principios añadidos:
+  - I. Tipado estricto de extremo a extremo
+  - II. Arquitectura por capas con dependencias unidireccionales
+  - III. Determinismo primero
+  - IV. Veracidad no negociable
+  - V. Privacidad y cumplimiento
+  - VI. Calidad verificable
+  - VII. Simplicidad (YAGNI)
+  - VIII. Observabilidad
+  - IX. Idioma
+- Secciones añadidas: Restricciones adicionales; Flujo de desarrollo; Gobernanza.
+- Secciones eliminadas: ninguna (todos los placeholders del template quedaron resueltos).
+- Deferred items / TODOs: ninguno.
+- Templates dependientes: plan/spec/tasks leen esta constitución en runtime; no requieren cambios.
+-->
 
-## Core Principles
+# Constitución de Vokara
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+Vokara es un agente de búsqueda de empleo (backend Python, frontend React) para
+profesionistas en México. La fuente de verdad de producto es
+`docs/product/roadmap.md`; las decisiones de arquitectura viven en `docs/adr/`.
+Esta constitución prevalece sobre cualquier otra práctica del proyecto.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+## Principios fundamentales
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### I. Tipado estricto de extremo a extremo (NO NEGOCIABLE)
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+- `mypy --strict` corre en CI y es bloqueante: un error de tipos impide el merge.
+- Pydantic v2 valida TODA frontera de datos: requests/responses de la API,
+  salidas de LLM (structured output), payloads de workers y adapters.
+- El cliente TypeScript del frontend se GENERA desde el esquema OpenAPI del
+  backend como parte del build. Está PROHIBIDO escribir tipos de API a mano en
+  el frontend.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+Racional: un cambio de esquema debe romper el build, no producción. El tipado
+es el contrato entre backend, frontend y LLM.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+### II. Arquitectura por capas con dependencias unidireccionales (NO NEGOCIABLE)
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+- Regla de dependencias: `api → services → repositories/adapters`. Nunca en
+  sentido inverso.
+- PROHIBIDA la lógica de negocio en routers y en tareas Celery: las tareas
+  solo orquestan servicios.
+- Todo lo externo (LLM, embeddings, fuentes de vacantes, correo, storage,
+  export de documentos) vive detrás de un adapter con interfaz propia e
+  intercambiable.
+- El adapter de LLM cubre también los embeddings. Cada vector persistido
+  almacena su `embedding_model` y `embedding_dim` para permitir migración de
+  proveedor sin pérdida de datos (ver ADR-003).
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Racional: los proveedores cambian; el dominio no debe enterarse. La
+unidireccionalidad mantiene el negocio testeable sin infraestructura.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### III. Determinismo primero (NO NEGOCIABLE)
 
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+- Los pipelines (ingesta, parseo, matching, generación de materiales) son
+  flujos deterministas y testeables. El LLM participa únicamente como
+  componente con entrada/salida tipada (structured output), nunca como agente
+  que decide el flujo.
+- El score de matching se calcula con reglas + embeddings y sub-scores
+  explicables (cobertura de must-haves, semántica, seniority, salario,
+  ubicación). NUNCA lo decide texto libre de un modelo; el LLM solo redacta
+  explicaciones a partir de sub-scores ya calculados.
+- Único componente conversacional/agéntico permitido: el simulador de
+  entrevistas.
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+Racional: predecible, barato, debuggeable y auditable. La explicabilidad del
+matching es una feature del producto, no un extra.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+### IV. Veracidad no negociable (NO NEGOCIABLE)
+
+- Todo material generado (CV sastre, cartas, mensajes, follow-ups, notas)
+  pasa por un verificador que compara cada afirmación contra el perfil base
+  del candidato.
+- Ninguna afirmación sin sustento llega al usuario: se regenera con la
+  restricción o se marca para revisión humana.
+- El resultado del verificador se persiste junto al material generado
+  (`generated_assets`).
+
+Racional: un CV con afirmaciones inventadas daña al candidato y destruye la
+confianza en el producto. Métrica guardián: 0 afirmaciones inventadas.
+
+### V. Privacidad y cumplimiento (NO NEGOCIABLE)
+
+- Los CVs son datos personales bajo la LFPDPPP (México): aviso de privacidad
+  y consentimiento explícito obligatorios.
+- Documentos cifrados en reposo; TLS en tránsito.
+- PII fuera de logs y de trazas de LLM (redacción obligatoria).
+- Derecho de eliminación real y verificable: borrar cuenta = borrar perfil,
+  documentos, embeddings y materiales generados (job asíncrono verificable).
+- PROHIBIDO el scraping de plataformas cuyos ToS lo prohíben (LinkedIn,
+  Indeed, OCC, Computrabajo).
+- PROHIBIDO el auto-apply headless con credenciales de usuarios: solo
+  assisted-apply con acción final humana.
+
+Racional: el riesgo legal y de baneo de cuentas de usuarios es existencial;
+las fuentes legítimas (APIs, correos de alertas, career pages con robots.txt,
+URL manual) cubren el alcance sin violar ToS.
+
+### VI. Calidad verificable (NO NEGOCIABLE)
+
+- Tests antes o junto al código (test-first donde sea práctico).
+- pytest para unit e integración; integración contra Postgres real con
+  testcontainers.
+- Todo componente que involucre un LLM requiere evals contra golden set
+  corriendo en CI. Cambiar un prompt sin correr evals es un bug.
+- Cobertura mínima 80% en `services/` y `domain/`.
+
+Racional: la mayor parte de la lógica es determinista y barata de testear;
+las evals convierten los cambios de prompt de acto de fe en cambio medible.
+
+### VII. Simplicidad — YAGNI (NO NEGOCIABLE)
+
+- Una sola base de datos: Postgres 16 + pgvector para todo, incluidos
+  embeddings. Sin vector-store aparte.
+- Sin microservicios en v1.
+- Despliegue con Docker Compose sobre VPS (ver ADR-002); sin Kubernetes en v1.
+- Cada dependencia nueva se justifica en el plan de la feature.
+
+Racional: equipo de 2–3 personas y decenas de usuarios en v1; cada pieza de
+infraestructura extra es fricción sin beneficio a esta escala.
+
+### VIII. Observabilidad (NO NEGOCIABLE)
+
+- Toda llamada a LLM se traza con costo, latencia y versión de prompt.
+- Logs estructurados con structlog.
+- Errores capturados en Sentry (backend y frontend).
+
+Racional: operar un producto LLM sin trazas de costo y latencia es volar a
+ciegas; los datos de tracing son la base para comparar proveedores (ADR-003).
+
+### IX. Idioma (NO NEGOCIABLE)
+
+- Producto y UX en español primero.
+- Código, identificadores, commits y nombres de ramas en inglés.
+- Specs y documentación de producto en español.
+
+Racional: los usuarios son hispanohablantes; el código en inglés mantiene
+consistencia con el ecosistema y las herramientas.
+
+## Restricciones adicionales
+
+- La fuente de verdad de producto es `docs/product/roadmap.md`; el alcance de
+  v1 sigue su priorización MoSCoW y su anti-alcance (sección 1.4).
+- Las decisiones de arquitectura viven en `docs/adr/` (ADR-001 auth JWT
+  propio, ADR-002 VPS + Docker Compose, ADR-003 Gemini detrás del adapter
+  LLM, ADR-004 taxonomía de skills propia). PROHIBIDO contradecirlas sin un
+  ADR nuevo que las reemplace.
+- Stack fijado por el roadmap (sección 5): Python 3.12 + FastAPI + SQLAlchemy
+  2.0 + Alembic + Celery/Redis en backend; React 18 + TypeScript + Vite +
+  TanStack Query en frontend. Cambios de stack requieren ADR.
+
+## Flujo de desarrollo
+
+- Flujo por feature: `/speckit.specify` → `/speckit.clarify` →
+  `/speckit.plan` → `/speckit.tasks` → `/speckit.analyze` →
+  `/speckit.implement`. El trabajo vive en ramas `00X-nombre`, nunca directo
+  en `main`.
+- Ante ambigüedad, spec faltante o conflicto con esta constitución: DETENERSE
+  y preguntar antes de implementar.
+- CI bloqueante en cada PR: ruff (lint + format), `mypy --strict`, tests,
+  evals de LLM cuando aplique, build de imágenes.
+- Definition of Done por feature: código tipado + tests + eval (si toca LLM)
+  + migración Alembic reversible + entrada en `docs/adr/` si hubo decisión de
+  arquitectura.
+- Toda revisión de PR verifica el cumplimiento de esta constitución; la
+  complejidad añadida debe justificarse en el plan.
+
+## Gobernanza
+
+- Esta constitución prevalece sobre cualquier otra práctica, guía o
+  costumbre del proyecto.
+- Modificarla requiere un PR aprobado por los fundadores Y un ADR en
+  `docs/adr/` que registre la decisión y sus alternativas descartadas.
+- Versionado semántico de la constitución: MAJOR para eliminaciones o
+  redefiniciones incompatibles de principios; MINOR para principios o
+  secciones nuevas o guía materialmente ampliada; PATCH para aclaraciones y
+  correcciones de redacción.
+- Los nueve principios fundamentales son NO NEGOCIABLES: no admiten
+  excepciones por conveniencia; solo una enmienda formal puede cambiarlos.
+
+**Version**: 1.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-09
