@@ -54,7 +54,7 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 
 ### Pilar 1 — Descubrimiento de vacantes ideales
 
-- **F1.1 [M] Ingesta de CV** — Upload PDF/DOCX → parseo a perfil estructurado (datos, experiencia, skills, educación, idiomas) con extracción LLM + salida tipada (Pydantic). El usuario **revisa y corrige** el perfil parseado en UI antes de continuar (human-in-the-loop: el parseo nunca es perfecto y este paso define la calidad de todo lo demás).
+- **F1.1 [M] Ingesta de CV maestro** — Upload PDF/DOCX → parseo con extracción LLM + salida tipada (Pydantic) que **siembra el perfil maestro**: entradas atómicas referenciables (experiencia, logros, skills, educación, idiomas — ver ADR-005). El usuario **revisa, corrige y enriquece** el perfil sembrado en UI y lo **confirma** antes de continuar (human-in-the-loop: el parseo nunca es perfecto y este gate define la calidad de todo lo demás). El archivo original se conserva como respaldo, no como fuente de verdad.
 - **F1.2 [M] Perfil enriquecido** — Cuestionario corto: objetivo de puesto, salario esperado, ubicación/remoto, industrias, deal-breakers. Normalización de skills contra taxonomía (ESCO o lista propia curada) para que "React.js", "ReactJS" y "React" sean la misma skill.
 - **F1.3 [M] Fuentes de vacantes (estrategia multi-canal):**
   1. **APIs de agregadores** (legítimas, con datos de México): Adzuna, Jooble, JSearch (RapidAPI, indexa Google for Jobs). Costo bajo, cobertura amplia.
@@ -68,7 +68,7 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 
 ### Pilar 2 — Maximizar entrevistas
 
-- **F2.1 [M] CV sastre por vacante** — Genera versión del CV alineada a la vacante: reordena, ajusta el resumen profesional, incorpora keywords de la JD **que el candidato realmente posee**. Exporta DOCX y PDF.
+- **F2.1 [M] CV sastre por vacante** — **Selecciona y reformula** el subconjunto más relevante de entradas del perfil maestro para la vacante (ADR-005): reordena, ajusta el resumen profesional, incorpora keywords de la JD **que el candidato realmente posee**; cada afirmación referencia su entrada de origen (`source_id`). Exporta DOCX y PDF.
 - **F2.2 [M] Verificación ATS** — El DOCX generado se re-parsea con el mismo parser de F1.1; si se pierden campos (tablas raras, columnas), se alerta. Chequeo de keywords de la JD presentes/ausentes.
 - **F2.3 [M] Carta de presentación por vacante** — Personalizada con empresa + rol + 2-3 puntos de match concretos.
 - **F2.4 [M] Tracker de aplicaciones (kanban)** — Máquina de estados: `DESCUBIERTA → GUARDADA → MATERIALES_LISTOS → APLICADA → SCREENING → ENTREVISTA(n) → OFERTA → NEGOCIACIÓN → ACEPTADA / RECHAZADA / SIN_RESPUESTA / RETIRADA`. Cada transición se registra con timestamp (alimenta las métricas del embudo personal).
@@ -152,7 +152,8 @@ La lección de ALPHA aplica aquí: **no todo debe ser "agéntico"**.
 ### 4.3 Modelo de datos (entidades núcleo)
 
 - `users` — auth, plan.
-- `candidate_profiles` — 1:1 con user; headline, años de experiencia, skills normalizadas, idiomas, expectativa salarial, preferencias (remoto, ubicaciones, industrias), embedding del perfil.
+- `candidate_profiles` — 1:1 con user; perfil maestro versionado (ADR-005); headline, años de experiencia, skills normalizadas, idiomas, expectativa salarial, preferencias (remoto, ubicaciones, industrias), embedding del perfil.
+- `profile_entries` — entradas atómicas referenciables del perfil maestro (experiencia, logro, educación, skill, certificación, idioma, proyecto, historia STAR), cada una con `id` propio; sustentan la trazabilidad por `source_id` de los materiales generados.
 - `documents` — CVs originales y versiones generadas (tipo, storage_url, hash).
 - `job_sources` — configuración por canal (api | email_alert | career_page | manual).
 - `companies` — nombre, dominio, dossier (jsonb), last_researched_at.
@@ -160,7 +161,7 @@ La lección de ALPHA aplica aquí: **no todo debe ser "agéntico"**.
 - `matches` — profile_id, job_id, score, sub-scores (jsonb), brechas (jsonb), feedback del usuario.
 - `applications` — job_id, estado (enum de la máquina de estados F2.4), canal, fechas, next_action_at.
 - `application_events` — timeline auditable de cada transición.
-- `generated_assets` — tipo (cv_tailored | cover_letter | followup | thankyou | recruiter_msg), contenido, metadatos del modelo, resultado del verificador de veracidad.
+- `generated_assets` — tipo (cv_tailored | cover_letter | followup | thankyou | recruiter_msg), contenido, metadatos del modelo, resultado del verificador de veracidad, referencias `source_id` por afirmación y versión del perfil maestro usada (ADR-005).
 - `interview_sessions` — application_id, tipo (mock | prep), transcript, scores de rúbrica, feedback.
 - `story_bank` — historias STAR del candidato etiquetadas por competencia.
 

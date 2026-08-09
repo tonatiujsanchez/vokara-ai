@@ -1,6 +1,14 @@
 <!--
 Sync Impact Report
 ==================
+- Version change: 1.0.0 → 1.1.0 (MINOR: guía material ampliada, principio nuevo)
+- Principio añadido: X. Control humano
+- Principio modificado: IV. Veracidad no negociable (define perfil maestro y
+  trazabilidad por source_id; ver ADR-005)
+- Gobernanza: "nueve principios" → "diez principios"
+- Deferred items / TODOs: ninguno.
+
+Historial previo (v1.0.0, ratificación inicial):
 - Version change: template (sin versión) → 1.0.0
 - Ratificación inicial: se reemplaza el template completo por la constitución de Vokara.
 - Principios añadidos:
@@ -74,16 +82,27 @@ matching es una feature del producto, no un extra.
 
 ### IV. Veracidad no negociable (NO NEGOCIABLE)
 
-- Todo material generado (CV sastre, cartas, mensajes, follow-ups, notas)
-  pasa por un verificador que compara cada afirmación contra el perfil base
-  del candidato.
-- Ninguna afirmación sin sustento llega al usuario: se regenera con la
-  restricción o se marca para revisión humana.
-- El resultado del verificador se persiste junto al material generado
-  (`generated_assets`).
+- El PERFIL MAESTRO (`candidate_profile`) es la única fuente de verdad sobre el
+  candidato: entidad estructurada, versionada y editable por el usuario,
+  sembrada a partir del CV maestro que sube y enriquecida con logros,
+  proyectos, historias STAR y respuestas del cuestionario. El archivo original
+  se conserva como respaldo, pero NO es la fuente de verdad (ver ADR-005).
+- El perfil se compone de entradas atómicas referenciables (`profile_entries`),
+  cada una con identificador propio.
+- Todo material generado (CV sastre, cartas, mensajes, follow-ups, notas) pasa
+  por un verificador que exige que CADA afirmación referencie la entrada del
+  perfil maestro que la sustenta (`source_id`).
+- Una afirmación sin `source_id` válido NO llega al usuario: se bloquea, se
+  regenera con la restricción o se marca para revisión humana.
+- Reformular una entrada es válido; exagerarla no. Las evals incluyen casos de
+  exageración como fallo.
+- Los materiales generados persisten el resultado del verificador y la versión
+  del perfil maestro con la que fueron producidos (`generated_assets`).
 
 Racional: un CV con afirmaciones inventadas daña al candidato y destruye la
-confianza en el producto. Métrica guardián: 0 afirmaciones inventadas.
+confianza en el producto. Con entradas referenciables, la verificación es una
+comprobación de trazabilidad determinista y barata, no un juicio semántico de
+un modelo. Métrica guardián: 0 afirmaciones sin sustento.
 
 ### V. Privacidad y cumplimiento (NO NEGOCIABLE)
 
@@ -143,6 +162,19 @@ ciegas; los datos de tracing son la base para comparar proveedores (ADR-003).
 Racional: los usuarios son hispanohablantes; el código en inglés mantiene
 consistencia con el ecosistema y las herramientas.
 
+### X. Control humano (NO NEGOCIABLE)
+
+- El perfil maestro nunca se marca como completo sin revisión y confirmación
+  explícita del candidato. No existe camino que omita ese gate.
+- Ningún material se envía a terceros sin acción final humana: assisted-apply,
+  follow-ups, mensajes a reclutadores y notas post-entrevista se preparan, no
+  se envían solos.
+- Vokara propone; el candidato decide.
+
+Racional: el candidato es responsable de lo que se dice en su nombre y es quien
+mejor conoce su historia. El control humano también es la salvaguarda operativa
+que hace viable el modelo assisted-apply del artículo V.
+
 ## Restricciones adicionales
 
 - La fuente de verdad de producto es `docs/product/roadmap.md`; el alcance de
@@ -181,7 +213,7 @@ consistencia con el ecosistema y las herramientas.
   redefiniciones incompatibles de principios; MINOR para principios o
   secciones nuevas o guía materialmente ampliada; PATCH para aclaraciones y
   correcciones de redacción.
-- Los nueve principios fundamentales son NO NEGOCIABLES: no admiten
+- Los diez principios fundamentales son NO NEGOCIABLES: no admiten
   excepciones por conveniencia; solo una enmienda formal puede cambiarlos.
 
-**Version**: 1.0.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-09
+**Version**: 1.1.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-09
