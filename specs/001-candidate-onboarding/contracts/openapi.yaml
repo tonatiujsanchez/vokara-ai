@@ -1,0 +1,941 @@
+openapi: 3.1.0
+
+# Contrato HTTP de diseño de la feature 001-candidate-onboarding.
+# El OpenAPI de producción lo genera FastAPI desde los modelos Pydantic; este
+# archivo es la fuente de diseño que la implementación debe satisfacer.
+# El cliente TypeScript se genera del OpenAPI de FastAPI (art. I): PROHIBIDO
+# escribir tipos de API a mano en el frontend.
+
+info:
+  title: Vokara API — Onboarding del candidato
+  version: "0.1.0"
+  description: |
+    Endpoints de la feature 001. Todos los mensajes de error viajan en español
+    (art. IX) acompañados de un `code` estable en inglés que el frontend usa
+    para decidir comportamiento, nunca para construir el texto.
+
+    El `candidate_id` se deriva SIEMPRE del token de acceso. Ningún endpoint lo
+    acepta como parámetro (FR-034).
+
+servers:
+  - url: /api/v1
+
+tags:
+  - name: auth
+    description: ADR-001. Precondición de la feature, sin FRs propios en 001.
+  - name: privacy
+    description: Aviso de privacidad y consentimiento (FR-030).
+  - name: documents
+    description: Subida y consulta del CV maestro (FR-001 – FR-006).
+  - name: parse-jobs
+    description: Estado y reintento del procesamiento (FR-004, FR-008).
+  - name: profile
+    description: Perfil maestro, objetivos y confirmación (FR-014 – FR-029).
+  - name: profile-entries
+    description: Entradas atómicas del perfil (FR-009 – FR-018).
+  - name: profile-versions
+    description: Historial inmutable de versiones (FR-025, FR-026).
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ─────────────────────────────── auth (ADR-001) ───────────────────────────
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Registra un candidato
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Cuenta creada; sesión iniciada
+          headers:
+            Set-Cookie:
+              description: refresh token opaco (httpOnly, Secure, SameSite=Lax)
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Inicia sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: Sesión iniciada
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rota el refresh token y emite un access token nuevo
+      description: |
+        Lee el refresh token de la cookie. Presentar un token ya usado revoca
+        toda la familia (detección de reuso, ADR-001) y devuelve 401.
+      security: []
+      responses:
+        '200':
+          description: Tokens rotados
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Cierra la sesión y revoca la familia de refresh tokens
+      responses:
+        '204': { description: Sesión cerrada }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Datos de la cuenta autenticada
+      responses:
+        '200':
+          description: Cuenta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Candidate' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ─────────────────────────────── privacidad ───────────────────────────────
+  /privacy-policy:
+    get:
+      tags: [privacy]
+      summary: Aviso de privacidad vigente y estado del consentimiento
+      responses:
+        '200':
+          description: Aviso vigente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PrivacyPolicyStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /consents:
+    post:
+      tags: [privacy]
+      summary: Registra el consentimiento explícito del candidato (FR-030)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policy_version]
+              properties:
+                policy_version: { type: string, examples: ["2026-08-01"] }
+      responses:
+        '201':
+          description: Consentimiento registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Consent' }
+        '409':
+          description: Ya existe consentimiento para esa versión
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ─────────────────────────────── documentos ───────────────────────────────
+  /documents:
+    post:
+      tags: [documents]
+      summary: Sube el CV maestro y encola su procesamiento (FR-001 – FR-004)
+      description: |
+        Validación síncrona antes de encolar: tamaño ≤ 10 MB, tipo real por
+        firma de bytes (no por extensión) y legibilidad del archivo. Un rechazo
+        aquí NO crea documento ni entradas (SC-008).
+
+        Requiere consentimiento vigente (FR-030) y que no exista otro
+        procesamiento activo del mismo candidato.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF o DOCX, máximo 10 MB
+      responses:
+        '202':
+          description: Archivo aceptado y procesamiento encolado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UploadAccepted' }
+        '400':
+          description: |
+            Archivo rechazado antes de procesar. `code` ∈ {FILE_TOO_LARGE,
+            UNSUPPORTED_FILE_TYPE, DOCUMENT_CORRUPT}
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            `code` ∈ {CONSENT_REQUIRED, PARSE_JOB_ALREADY_ACTIVE,
+            PROFILE_ALREADY_SEEDED}. El último se reserva para la feature 007.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413':
+          description: Cuerpo excedido en el proxy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /documents/{document_id}:
+    get:
+      tags: [documents]
+      summary: Metadatos del documento y su procesamiento
+      parameters:
+        - { name: document_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Documento
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Document' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─────────────────────────────── parse jobs ───────────────────────────────
+  /parse-jobs/current:
+    get:
+      tags: [parse-jobs]
+      summary: Trabajo de procesamiento más reciente del candidato
+      description: |
+        Punto de entrada del polling del frontend al volver a la aplicación
+        (edge case "cierre del navegador durante el procesamiento").
+      responses:
+        '200':
+          description: Trabajo más reciente, o `null` si nunca hubo uno
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ParseJob' }
+                  - { type: 'null' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /parse-jobs/{job_id}:
+    get:
+      tags: [parse-jobs]
+      summary: Estado del procesamiento (FR-004)
+      parameters:
+        - { name: job_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Estado del trabajo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParseJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /parse-jobs/{job_id}/retry:
+    post:
+      tags: [parse-jobs]
+      summary: Reintenta un procesamiento fallido (FR-008)
+      description: |
+        Solo se acepta sobre un trabajo en estado `failed`. Crea un trabajo
+        nuevo sobre el mismo documento; la siembra es aditiva y nunca borra
+        entradas creadas o editadas por el candidato.
+      parameters:
+        - { name: job_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '202':
+          description: Reintento encolado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ParseJob' }
+        '409':
+          description: |
+            `code` ∈ {PARSE_JOB_NOT_RETRYABLE, PARSE_JOB_ALREADY_ACTIVE}
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─────────────────────────────── perfil ───────────────────────────────────
+  /profile:
+    get:
+      tags: [profile]
+      summary: Perfil maestro del candidato autenticado
+      description: |
+        Devuelve el trabajo en curso más el estado derivado: paso del onboarding
+        (FR-019 / US2 AC5), bloqueadores de confirmación (FR-024) y si hay
+        cambios sin confirmar (FR-029). El perfil se crea de forma perezosa: si
+        no existe, se devuelve uno vacío en estado `draft`.
+      responses:
+        '200':
+          description: Perfil
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /profile/objectives:
+    patch:
+      tags: [profile]
+      summary: Actualiza el cuestionario de objetivos (FR-020 – FR-022)
+      description: |
+        Actualización parcial. `salary_min` no puede superar a `salary_max` y la
+        moneda es obligatoria si hay cualquier valor salarial (FR-021); el error
+        se explica en español.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ObjectivesPatch' }
+      responses:
+        '200':
+          description: Objetivos actualizados
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Profile' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /profile/confirm:
+    post:
+      tags: [profile]
+      summary: Confirmación explícita del candidato (FR-023 – FR-025, art. X)
+      description: |
+        ÚNICO camino por el que un perfil llega a `complete`. Crea una versión
+        inmutable con el contenido íntegro (entradas vivas + objetivos) y la
+        deja como versión vigente. Sobre un perfil ya `complete`, confirma los
+        cambios pendientes creando una versión nueva (FR-029) sin cambiar el
+        estado.
+      responses:
+        '201':
+          description: Versión creada y perfil confirmado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileVersion' }
+        '409':
+          description: |
+            `code` = NO_PENDING_CHANGES — el perfil está confirmado y no hay
+            nada que confirmar.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: |
+            `code` = CONFIRMATION_BLOCKED. `details.blockers` enumera exactamente
+            qué falta (FR-024).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /profile/pending-changes:
+    get:
+      tags: [profile]
+      summary: Detalle de los cambios sin confirmar (FR-029)
+      description: |
+        Diff determinista entre el trabajo en curso y la versión vigente. Si no
+        hay versión vigente, `has_changes` es falso y las listas van vacías: todo
+        el perfil es trabajo en curso todavía sin confirmar.
+      responses:
+        '200':
+          description: Diff
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PendingChanges' }
+
+  # ─────────────────────────── entradas del perfil ──────────────────────────
+  /profile/entries:
+    get:
+      tags: [profile-entries]
+      summary: Lista las entradas vivas del perfil (FR-015)
+      parameters:
+        - name: entry_type
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/EntryType' }
+      responses:
+        '200':
+          description: Entradas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProfileEntry' }
+    post:
+      tags: [profile-entries]
+      summary: Crea una entrada nueva (FR-018, FR-007)
+      description: Se registra siempre con origen `user_added`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EntryCreate' }
+      responses:
+        '201':
+          description: Entrada creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileEntry' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /profile/entries/{entry_id}:
+    get:
+      tags: [profile-entries]
+      summary: Detalle de una entrada
+      parameters:
+        - { name: entry_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Entrada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileEntry' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [profile-entries]
+      summary: Edita una entrada (FR-016)
+      description: |
+        El identificador NUNCA cambia (FR-010). Si la entrada tenía origen
+        `cv_seed` y el contenido cambia de verdad, pasa a `user_edited`; un
+        guardado sin cambios no altera el origen. Las entradas `user_added`
+        conservan su origen (ver research.md R-09).
+      parameters:
+        - { name: entry_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EntryPatch' }
+      responses:
+        '200':
+          description: Entrada actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileEntry' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [profile-entries]
+      summary: Elimina una entrada del perfil (FR-017)
+      parameters:
+        - { name: entry_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Entrada eliminada; no reaparece en revisiones posteriores }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ─────────────────────────── versiones del perfil ─────────────────────────
+  /profile/versions:
+    get:
+      tags: [profile-versions]
+      summary: Historial de versiones confirmadas (FR-026)
+      responses:
+        '200':
+          description: Versiones, de la más reciente a la más antigua
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProfileVersionSummary' }
+
+  /profile/versions/{version_id}:
+    get:
+      tags: [profile-versions]
+      summary: Contenido íntegro de una versión pasada (FR-026)
+      parameters:
+        - { name: version_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Versión con su contenido completo e inmutable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProfileVersion' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de vida corta, mantenido en memoria del frontend (ADR-001).
+
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido, expirado o revocado
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: |
+        El recurso no existe o no pertenece al candidato autenticado. Se
+        responde 404 (no 403) para no revelar la existencia de recursos ajenos
+        (FR-034).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Conflicto con el estado actual del recurso
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Cuerpo inválido; mensaje explicativo en español
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Demasiadas solicitudes (ADR-001)
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Código estable en inglés. Catálogo completo en contracts/errors.md.
+          examples: ["PDF_WITHOUT_TEXT_LAYER"]
+        message:
+          type: string
+          description: |
+            Mensaje accionable en español (art. IX). NUNCA incluye contenido del
+            documento ni datos personales (FR-031).
+          examples: ["Tu PDF no tiene texto seleccionable..."]
+        details:
+          type: object
+          additionalProperties: true
+          description: Información estructurada específica del error (campos inválidos, bloqueadores).
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, maxLength: 128 }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, const: bearer }
+        expires_in: { type: integer, description: Segundos de vida del access token, examples: [900] }
+
+    Candidate:
+      type: object
+      required: [id, email, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+
+    PrivacyPolicyStatus:
+      type: object
+      required: [current_version, url, has_accepted_current]
+      properties:
+        current_version: { type: string }
+        url: { type: string, format: uri }
+        has_accepted_current: { type: boolean }
+        accepted_at: { type: [string, 'null'], format: date-time }
+
+    Consent:
+      type: object
+      required: [policy_version, accepted_at]
+      properties:
+        policy_version: { type: string }
+        accepted_at: { type: string, format: date-time }
+
+    UploadAccepted:
+      type: object
+      required: [document_id, parse_job]
+      properties:
+        document_id: { type: string, format: uuid }
+        parse_job: { $ref: '#/components/schemas/ParseJob' }
+
+    Document:
+      type: object
+      required: [id, kind, original_filename, size_bytes, uploaded_at, availability]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [pdf, docx] }
+        original_filename: { type: string }
+        size_bytes: { type: integer }
+        uploaded_at: { type: string, format: date-time }
+        availability:
+          type: string
+          enum: [available]
+          description: La feature 006 añadirá `deleted_by_candidate` y `purged_by_retention`.
+        latest_parse_job:
+          oneOf:
+            - { $ref: '#/components/schemas/ParseJob' }
+            - { type: 'null' }
+
+    ParseJob:
+      type: object
+      required: [id, document_id, status, progress_percent, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        step:
+          type: [string, 'null']
+          enum: [extracting_text, classifying, extracting_entries, persisting, null]
+        progress_percent: { type: integer, minimum: 0, maximum: 100 }
+        error_code:
+          type: [string, 'null']
+          description: Código del catálogo cuando `status` es `failed`.
+        error_message:
+          type: [string, 'null']
+          description: Mensaje accionable en español, resuelto desde el catálogo. Sin PII.
+        entries_created: { type: integer }
+        truncated:
+          type: boolean
+          description: El texto del documento superó el límite de extracción y se truncó (research R-14).
+        is_retryable:
+          type: boolean
+          description: Verdadero solo si `status` es `failed` (FR-008).
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+
+    ProfileState:
+      type: string
+      enum: [draft, complete]
+
+    OnboardingStep:
+      type: string
+      description: Paso derivado del estado, no persistido (research R-18).
+      enum: [consent, upload, processing, processing_failed, objectives, confirm, done]
+
+    Objectives:
+      type: object
+      required: [locations, industries, deal_breakers]
+      properties:
+        target_role: { type: [string, 'null'] }
+        salary_min: { type: [number, 'null'] }
+        salary_max: { type: [number, 'null'] }
+        salary_currency: { type: [string, 'null'], enum: [MXN, USD, null] }
+        remote_preference: { type: [string, 'null'], enum: [onsite, hybrid, remote, any, null] }
+        locations: { type: array, items: { type: string } }
+        industries: { type: array, items: { type: string } }
+        deal_breakers: { type: array, items: { type: string } }
+
+    ObjectivesPatch:
+      type: object
+      description: Actualización parcial; solo se modifican los campos presentes.
+      properties:
+        target_role: { type: [string, 'null'] }
+        salary_min: { type: [number, 'null'] }
+        salary_max: { type: [number, 'null'] }
+        salary_currency: { type: [string, 'null'], enum: [MXN, USD, null] }
+        remote_preference: { type: [string, 'null'], enum: [onsite, hybrid, remote, any, null] }
+        locations: { type: array, items: { type: string } }
+        industries: { type: array, items: { type: string } }
+        deal_breakers: { type: array, items: { type: string } }
+
+    ConfirmationBlocker:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [NO_ENTRIES, MISSING_TARGET_ROLE, MISSING_LOCATION_OR_REMOTE, MISSING_SALARY_EXPECTATION]
+        message: { type: string, description: Explicación en español de qué falta (FR-024). }
+
+    Profile:
+      type: object
+      required:
+        [id, state, objectives, onboarding_step, entry_counts,
+         has_unconfirmed_changes, confirmation_blockers]
+      properties:
+        id: { type: string, format: uuid }
+        state: { $ref: '#/components/schemas/ProfileState' }
+        objectives: { $ref: '#/components/schemas/Objectives' }
+        onboarding_step: { $ref: '#/components/schemas/OnboardingStep' }
+        entry_counts:
+          type: object
+          description: Conteo de entradas vivas por tipo, para la navegación de la revisión.
+          additionalProperties: { type: integer }
+        incomplete_entry_count:
+          type: integer
+          description: Entradas marcadas como incompletas (US2 AC4).
+        current_version:
+          oneOf:
+            - { $ref: '#/components/schemas/ProfileVersionSummary' }
+            - { type: 'null' }
+        last_confirmed_at: { type: [string, 'null'], format: date-time }
+        has_unconfirmed_changes:
+          type: boolean
+          description: Derivado del hash de contenido, no persistido (FR-029, research R-08).
+        confirmation_blockers:
+          type: array
+          description: Vacío ⇔ el perfil puede confirmarse (FR-024).
+          items: { $ref: '#/components/schemas/ConfirmationBlocker' }
+
+    EntryType:
+      type: string
+      enum: [experience, achievement, education, skill, certification, language, project]
+
+    EntryOrigin:
+      type: string
+      enum: [cv_seed, user_added, user_edited]
+
+    ProfileEntry:
+      type: object
+      required: [id, entry_type, origin, content, is_complete, missing_fields, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador estable; no cambia por ediciones posteriores (FR-010).
+        entry_type: { $ref: '#/components/schemas/EntryType' }
+        origin: { $ref: '#/components/schemas/EntryOrigin' }
+        content: { $ref: '#/components/schemas/EntryContent' }
+        content_language:
+          type: [string, 'null']
+          description: ISO 639-1 del contenido; nunca se traduce (FR-012).
+        is_complete:
+          type: boolean
+          description: Calculado por reglas deterministas, no por el modelo (FR-013).
+        missing_fields:
+          type: array
+          items: { type: string }
+          description: Campos clave ausentes cuando `is_complete` es falso.
+        source_document_id: { type: [string, 'null'], format: uuid }
+        source_excerpt:
+          type: [string, 'null']
+          description: Fragmento literal del CV del que se extrajo la entrada.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EntryCreate:
+      type: object
+      required: [entry_type, content]
+      properties:
+        entry_type: { $ref: '#/components/schemas/EntryType' }
+        content: { $ref: '#/components/schemas/EntryContent' }
+        content_language: { type: [string, 'null'] }
+
+    EntryPatch:
+      type: object
+      required: [content]
+      properties:
+        content: { $ref: '#/components/schemas/EntryContent' }
+        content_language: { type: [string, 'null'] }
+
+    # Unión discriminada: FastAPI la genera desde el Union[...] de Pydantic v2 y
+    # openapi-typescript la traduce a una unión discriminada de TypeScript, con
+    # lo que el estrechamiento de tipo en el front lo hace el compilador (art. I).
+    EntryContent:
+      oneOf:
+        - { $ref: '#/components/schemas/ExperienceContent' }
+        - { $ref: '#/components/schemas/AchievementContent' }
+        - { $ref: '#/components/schemas/EducationContent' }
+        - { $ref: '#/components/schemas/SkillContent' }
+        - { $ref: '#/components/schemas/CertificationContent' }
+        - { $ref: '#/components/schemas/LanguageContent' }
+        - { $ref: '#/components/schemas/ProjectContent' }
+      discriminator:
+        propertyName: kind
+        mapping:
+          experience: '#/components/schemas/ExperienceContent'
+          achievement: '#/components/schemas/AchievementContent'
+          education: '#/components/schemas/EducationContent'
+          skill: '#/components/schemas/SkillContent'
+          certification: '#/components/schemas/CertificationContent'
+          language: '#/components/schemas/LanguageContent'
+          project: '#/components/schemas/ProjectContent'
+
+    # Fechas parciales: los CVs rara vez traen día. Forzar uno sería inventar
+    # precisión que el documento no tiene (art. IV).
+    PartialDate:
+      type: [string, 'null']
+      pattern: '^\d{4}(-\d{2})?$'
+      examples: ["2023-05", "2019"]
+
+    ExperienceContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: experience }
+        title: { type: [string, 'null'] }
+        organization: { type: [string, 'null'] }
+        start_date: { $ref: '#/components/schemas/PartialDate' }
+        end_date: { $ref: '#/components/schemas/PartialDate' }
+        is_current: { type: [boolean, 'null'] }
+        location: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        highlights: { type: array, items: { type: string } }
+
+    AchievementContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: achievement }
+        description: { type: [string, 'null'] }
+        metric: { type: [string, 'null'] }
+        context: { type: [string, 'null'] }
+        related_organization: { type: [string, 'null'] }
+        occurred_at: { $ref: '#/components/schemas/PartialDate' }
+
+    EducationContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: education }
+        institution: { type: [string, 'null'] }
+        degree: { type: [string, 'null'] }
+        field_of_study: { type: [string, 'null'] }
+        start_date: { $ref: '#/components/schemas/PartialDate' }
+        end_date: { $ref: '#/components/schemas/PartialDate' }
+        status: { type: [string, 'null'], enum: [completed, in_progress, incomplete, null] }
+
+    SkillContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: skill }
+        name: { type: [string, 'null'] }
+        category: { type: [string, 'null'] }
+        level: { type: [string, 'null'] }
+        years_of_experience: { type: [number, 'null'] }
+
+    CertificationContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: certification }
+        name: { type: [string, 'null'] }
+        issuer: { type: [string, 'null'] }
+        issued_at: { $ref: '#/components/schemas/PartialDate' }
+        expires_at: { $ref: '#/components/schemas/PartialDate' }
+        credential_id: { type: [string, 'null'] }
+
+    LanguageContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: language }
+        name: { type: [string, 'null'] }
+        level: { type: [string, 'null'], enum: [basic, intermediate, advanced, native, null] }
+        certification: { type: [string, 'null'] }
+
+    ProjectContent:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, const: project }
+        name: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        role: { type: [string, 'null'] }
+        technologies: { type: array, items: { type: string } }
+        url: { type: [string, 'null'], format: uri }
+        start_date: { $ref: '#/components/schemas/PartialDate' }
+        end_date: { $ref: '#/components/schemas/PartialDate' }
+
+    ProfileVersionSummary:
+      type: object
+      required: [id, version_number, origin, created_at, entry_count]
+      properties:
+        id: { type: string, format: uuid }
+        version_number: { type: integer }
+        origin:
+          type: string
+          enum: [confirmation]
+          description: La feature 007 añadirá `cv_merge`.
+        created_at: { type: string, format: date-time }
+        entry_count: { type: integer }
+        is_current: { type: boolean }
+
+    ProfileVersion:
+      allOf:
+        - { $ref: '#/components/schemas/ProfileVersionSummary' }
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: object
+              required: [objectives, entries]
+              description: |
+                Contenido íntegro e inmutable en el momento de la confirmación
+                (FR-025, FR-026). Las entradas van embebidas completas, no por
+                referencia: la versión debe leerse aunque la entrada se borre
+                después.
+              properties:
+                objectives: { $ref: '#/components/schemas/Objectives' }
+                entries:
+                  type: array
+                  items: { $ref: '#/components/schemas/ProfileEntry' }
+
+    PendingChanges:
+      type: object
+      required: [has_changes, added, modified, removed, objectives_changed]
+      description: Diff determinista entre el trabajo en curso y la versión vigente (FR-029).
+      properties:
+        has_changes: { type: boolean }
+        added:
+          type: array
+          items: { $ref: '#/components/schemas/ProfileEntry' }
+        modified:
+          type: array
+          items:
+            type: object
+            required: [entry, changed_fields]
+            properties:
+              entry: { $ref: '#/components/schemas/ProfileEntry' }
+              changed_fields: { type: array, items: { type: string } }
+        removed:
+          type: array
+          description: Entradas presentes en la versión vigente y ya no en el trabajo en curso.
+          items: { $ref: '#/components/schemas/ProfileEntry' }
+        objectives_changed:
+          type: array
+          items: { type: string }
