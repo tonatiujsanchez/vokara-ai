@@ -7,7 +7,22 @@ Copiar cada ADR a `docs/adr/` como archivo independiente antes de ejecutar
 
 # ADR-001 — Autenticación con JWT propio
 
-**Estado:** Aceptado · **Fecha:** 2026-07
+**Estado:** Superseded por [ADR-008](008-sin-autenticacion-v1-local.md) ·
+**Fecha:** 2026-07 · **Superseded:** 2026-08
+
+> **Nota de reemplazo.** Vokara pivota a software open source de ejecución
+> local: una instancia por persona, en su propia máquina, sin backend hospedado
+> y sin cuentas (constitución v2.0.0, arts. V y VII). Sin usuarios múltiples no
+> hay a quién autenticar: registro, login, refresh tokens y recuperación de
+> contraseña dejan de tener sujeto. El ADR-008 documenta la decisión de no
+> tener autenticación en v1 y cómo se preserva `candidate_id` en el modelo de
+> datos para no cerrar la puerta.
+>
+> **Este documento se conserva porque su diseño sigue siendo válido.** Si algún
+> día existe una versión hospedada de Vokara, el esquema descrito aquí —Argon2id,
+> access token de vida corta en memoria, refresh opaco con rotación y detección
+> de reuso, revocación por `jti` en Redis— es el punto de partida, no material
+> de archivo. Lo que caducó es la necesidad, no el diseño.
 
 ## Contexto
 Vokara maneja CVs, datos personales y materiales generados. Necesita registro,
@@ -53,7 +68,22 @@ Implementar autenticación propia con JWT en FastAPI:
 
 # ADR-002 — Despliegue en VPS Hostinger con Docker Compose
 
-**Estado:** Aceptado · **Fecha:** 2026-07
+**Estado:** Superseded por [ADR-009](009-distribucion-local-first.md) ·
+**Fecha:** 2026-07 · **Superseded:** 2026-08
+
+> **Nota de reemplazo.** No hay despliegue hospedado que operar. Con el pivote
+> a ejecución local (constitución v2.0.0, art. VII: "Ejecución local con Docker
+> Compose; sin despliegue hospedado en v1"), el VPS Hostinger, los ambientes
+> `staging` y `prod`, el reverse proxy con TLS y el despliegue por CI vía SSH
+> quedan sin objeto: la única "instalación" es la máquina de cada usuario. El
+> ADR-009 documenta el modelo de distribución que lo reemplaza.
+>
+> Lo que sobrevive de este documento es el **Compose local**: los servicios
+> `api`, `worker`, `beat`, `postgres` y `redis` siguen siendo la forma de
+> levantar Vokara, ahora en la máquina del usuario y sujetos al criterio de
+> fricción de instalación del art. VII. Lo que caduca es todo lo relativo a
+> operar esos servicios para terceros: backups centrales, monitoreo, umbrales
+> de escalado y separación staging/prod.
 
 ## Contexto
 El equipo ya opera un VPS Hostinger (KVM 2) y tiene experiencia con Docker.
@@ -90,32 +120,56 @@ previas).
 
 ---
 
-# ADR-003 — Google Gemini como proveedor LLM inicial
+# ADR-003 — Google Gemini como proveedor LLM por defecto
 
-**Estado:** Aceptado · **Fecha:** 2026-07
+**Estado:** Aceptado · **Fecha:** 2026-07 · **Enmendado:** 2026-08 (pivote
+local-first: de proveedor único a default sugerido)
 
 ## Contexto
 Vokara usa LLM para: parseo de CV, parseo de JD, explicación de matches,
 generación de materiales, verificación de veracidad y simulador de entrevistas.
 Además requiere embeddings para el sub-score semántico del matching.
 
-## Decisión
-Usar **Google Gemini** como proveedor inicial, detrás del adapter
-`adapters/llm/` definido por la constitución (art. 2). Integración vía
-`langchain-google-genai` para aprovechar `with_structured_output` con esquemas
-Pydantic (constitución art. 3).
+**Enmienda 2026-08.** Con el pivote a ejecución local, **la API key la pone el
+usuario**, no el proyecto. Eso invierte la naturaleza de esta decisión: ya no
+se elige el proveedor *del producto*, se elige el que Vokara **sugiere por
+defecto** a quien no tenga preferencia. La portabilidad entre proveedores pasa
+a ser un principio constitucional (art. XI), no una precaución.
 
-Asignación por tarea (revisable con datos de costo real):
+## Decisión
+Usar **Google Gemini como proveedor por defecto**, detrás del adapter
+`adapters/llm/` definido por la constitución (art. II). Integración vía
+`langchain-google-genai` para aprovechar `with_structured_output` con esquemas
+Pydantic (constitución art. III).
+
+El criterio del default es la **capa gratuita**: es el único proveedor mayor con
+un tier gratuito suficiente para usar Vokara de verdad sin tarjeta de crédito.
+Para un producto comunitario dirigido a personas buscando empleo —que pueden
+estar sin ingresos— eso no es una ventaja de costo, es la diferencia entre poder
+usarlo y no poder.
+
+**Gemini es el default, no el único.** Vokara soporta varios proveedores y el
+usuario configura el suyo (constitución art. XI): ninguna feature puede asumir
+Gemini, y una capacidad no soportada por el proveedor elegido degrada de forma
+explícita e informada. Este ADR fija a qué apunta la configuración de ejemplo
+del README, no a qué se ata el código.
+
+Asignación por tarea con Gemini (revisable con datos de costo real):
 - Clasificación y parseo estructurado → modelo rápido/económico de la familia.
 - Generación de materiales y simulador → modelo de mayor capacidad.
 - Embeddings → modelo de embeddings de Google.
 
 ## Alternativas descartadas
-- **OpenAI:** el equipo ya lo conoce por ALPHA, pero Gemini ofrece mejor
-  relación costo/capacidad para el volumen esperado y un tier gratuito útil
-  durante el desarrollo. Sigue siendo el fallback natural.
-- **Modelos locales:** descartados en v1 por la carga de operación en un VPS
-  compartido.
+- **OpenAI:** el equipo ya lo conoce por ALPHA y su calidad no está en
+  discusión, pero sin capa gratuita utilizable obligaría a cada usuario a poner
+  tarjeta antes de probar Vokara. Descartado **como default**, no como
+  proveedor: es un proveedor soportado de primera clase.
+- **Modelos locales (Ollama y similares):** descartados como default por
+  fricción de instalación (art. VII) y por requisitos de hardware que no todo
+  usuario tiene. Ya no aplica el motivo original —la carga sobre un VPS
+  compartido—, así que dejan de estar descartados como opción soportada: son el
+  camino natural para quien quiera que *ningún* dato salga de su máquina, y
+  encajan sin cambios en el adapter del art. XI.
 
 ## Consecuencias — atención al punto de embeddings
 - **La dimensión del embedding se filtra al esquema de la base de datos.** La
@@ -127,12 +181,28 @@ Asignación por tarea (revisable con datos de costo real):
   permitir convivencia de dos modelos durante una migración (columna adicional
   o tabla de embeddings separada por modelo).
 - Toda llamada al LLM se traza con costo, latencia y versión de prompt
-  (constitución art. 8), para poder comparar proveedores con datos reales.
+  (constitución art. VIII), para poder comparar proveedores con datos reales.
+- **Las trazas de LLM se limitan a METADATOS: nunca contenido de prompt ni de
+  respuesta.** Se registran modelo, versión de prompt, tokens, costo, latencia y
+  resultado (éxito/error). El motivo es concreto: el prompt de extracción de CV
+  lleva el CV íntegro, es decir PII completa —nombre, teléfono, correo,
+  domicilio, historial laboral—, y lo mismo vale para el perfil maestro que
+  alimenta la generación de materiales. Un prompt de Vokara no es "texto con
+  algo de PII" del que se puedan redactar campos: es PII de principio a fin.
+  Por eso **queda descartado instrumentar Langfuse, LangSmith o cualquier
+  plataforma de observabilidad de LLM que capture prompts**, tanto hospedada
+  como auto-alojada: su valor está justamente en guardar el contenido, que es lo
+  único que aquí no puede guardarse. La contrapartida es real —depurar un prompt
+  sin ver la entrada que lo rompió es más difícil— y se asume: se reproduce con
+  el golden set, que es material sintético y sí puede inspeccionarse.
 - Las evals del golden set deben poder correrse contra más de un proveedor:
-  son la única forma objetiva de justificar un cambio futuro.
+  son la única forma objetiva de justificar un cambio futuro y la prueba
+  ejecutable del art. XI.
 - Verificar disponibilidad regional y términos de uso de datos (que los datos
-  de usuarios no se usen para entrenamiento) antes de la beta con usuarios
-  reales.
+  de usuarios no se usen para entrenamiento) de cada proveedor soportado, y
+  **divulgarlo en el README**: con ejecución local la elección de proveedor es
+  del usuario, y el art. V exige decirle explícitamente qué sale de su máquina
+  y hacia dónde.
 
 ---
 

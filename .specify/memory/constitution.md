@@ -1,6 +1,73 @@
 <!--
 Sync Impact Report
 ==================
+- Version change: 2.0.0 → 2.1.0 (MINOR: guía materialmente ampliada en un
+  principio existente; sin principios nuevos ni eliminados)
+- Principio MODIFICADO: VIII. Observabilidad. "Errores capturados en Sentry
+  (backend y frontend)" → errores en logs locales estructurados, con el envío a
+  un servicio externo sujeto al opt-in explícito del art. V y desactivado por
+  defecto.
+- CONFLICTO RESUELTO: la contradicción abierta en v2.0.0 entre el art. VIII
+  (exigía Sentry) y el art. V (prohíbe enviar reportes de error a terceros por
+  defecto) queda cerrada por esta enmienda. El art. V es la norma; el art. VIII
+  ya no la contradice, la referencia.
+- Principios SIN CAMBIO: I, II, III, IV, V, VI, VII, IX, X, XI.
+- Gobernanza: sin cambios (siguen siendo once principios).
+- Deferred items / TODOs:
+  - Ninguno nuevo. **Pendiente de gobernanza CERRADO:** el ADR exigido para la
+    enmienda v2.0.0 es el **ADR-009 — Distribución local-first open source**,
+    que registra la decisión y sus alternativas descartadas. Reemplaza al
+    ADR-002; el ADR-008 (sin autenticación en v1 local) reemplaza al ADR-001.
+    El ADR-006 se conserva vigente con nota.
+  - Sigue abierto lo que ya estaba fuera de esta enmienda: `docs/product/roadmap.md`
+    (§4, §5, §7, §9) y `specs/001-candidate-onboarding/` describen un producto
+    hospedado con cuentas.
+- Templates dependientes: sin cambios; plan/spec/tasks leen esta constitución
+  en runtime.
+
+Historial previo (v2.0.0, pivote a ejecución local):
+- Version change: 1.1.1 → 2.0.0 (MAJOR: redefinición incompatible de
+  principios por el pivote a software open source de ejecución local)
+- ADR que registra esta enmienda (requisito de gobernanza): **ADR-009 —
+  Distribución local-first open source** (`docs/adr/009-distribucion-local-first.md`).
+- Contexto del cambio: Vokara deja de ser un servicio hospedado. Cada persona
+  clona el repositorio, lo ejecuta en su máquina y aporta su propia API key de
+  LLM. Sin backend hospedado, sin cuentas, sin autenticación.
+- Principio REDEFINIDO: V. "Privacidad y cumplimiento" → "Privacidad
+  local-first y transparencia". Se reescribe alrededor de dos ideas: los datos
+  del candidato no salen de su máquina salvo el contenido enviado al proveedor
+  de LLM que él mismo configuró, y esa excepción se divulga explícitamente.
+  - Añadido: divulgación obligatoria en primera ejecución y en README; cero
+    telemetría/analítica/reportes de error a terceros por defecto (telemetría
+    futura exige opt-in y ADR propio); API keys leídas de configuración local,
+    nunca persistidas en base de datos ni presentes en logs o trazas.
+  - Conservado: PII fuera de logs y trazas; prohibición de scraping de
+    plataformas con ToS restrictivos; assisted-apply con acción humana final.
+  - ELIMINADO: aviso de privacidad LFPDPPP como responsable de datos; cifrado
+    en reposo obligatorio; derecho de eliminación como job asíncrono
+    verificable. Motivo: sin backend hospedado no hay responsable de datos ni
+    base central; borrar es borrar el directorio local.
+- Principio MODIFICADO: VII. Simplicidad (YAGNI). "Despliegue con Docker
+  Compose sobre VPS (ADR-002)" → "Ejecución local con Docker Compose; sin
+  despliegue hospedado en v1". Criterio nuevo: la fricción de instalación es
+  parte del alcance del producto.
+- Principio AÑADIDO: XI. Portabilidad de proveedor.
+- Principios SIN CAMBIO: I, II, III, IV, VI, VIII, IX, X.
+- Gobernanza: "diez principios" → "once principios".
+- Deferred items / TODOs (estado actualizado en v2.1.0):
+  - RESUELTO: el ADR que la gobernanza exigía para esta enmienda es el ADR-009
+    (distribución local-first), que además reemplaza al ADR-002; el ADR-008
+    (sin autenticación en v1 local) reemplaza al ADR-001. El ADR-006 (SPA) se
+    conserva vigente: perdió una de sus cuatro razones, no su conclusión.
+  - RESUELTO en v2.1.0: el conflicto entre el art. VIII (exigía Sentry) y el
+    art. V (prohíbe enviar reportes de error a terceros por defecto).
+- Templates dependientes: sin cambios; plan/spec/tasks leen esta constitución
+  en runtime.
+- Artefactos de producto a revisar: `docs/product/roadmap.md` (§4 arquitectura,
+  §5 stack, §7 seguridad y privacidad, §9 despliegue y operación) describe un
+  producto hospedado con cuentas.
+
+Historial previo (v1.1.1, corrección de redacción):
 - Version change: 1.1.0 → 1.1.1 (PATCH: corrección de redacción, sin cambio de
   principios)
 - Principios: sin cambios. Los diez principios fundamentales permanecen
@@ -118,22 +185,37 @@ confianza en el producto. Con entradas referenciables, la verificación es una
 comprobación de trazabilidad determinista y barata, no un juicio semántico de
 un modelo. Métrica guardián: 0 afirmaciones sin sustento.
 
-### V. Privacidad y cumplimiento (NO NEGOCIABLE)
+### V. Privacidad local-first y transparencia (NO NEGOCIABLE)
 
-- Los CVs son datos personales bajo la LFPDPPP (México): aviso de privacidad
-  y consentimiento explícito obligatorios.
-- Documentos cifrados en reposo; TLS en tránsito.
+- Los datos del candidato —CV original, perfil maestro, embeddings, materiales
+  generados, historial de aplicaciones— NUNCA salen de su máquina. Existe UNA
+  sola excepción: el contenido que Vokara envía al proveedor de LLM que el
+  propio usuario configuró con su API key.
+- Esa excepción se divulga de forma explícita y en texto claro EN LA PRIMERA
+  EJECUCIÓN y en el README: qué se envía, a qué proveedor y en qué momento del
+  flujo. PROHIBIDO enterrar la divulgación en documentación secundaria o darla
+  por sabida.
+- Vokara NO envía telemetría, analítica ni reportes de error a terceros por
+  defecto. Cualquier telemetría futura exige opt-in explícito del usuario Y un
+  ADR propio que la justifique; sin ambas cosas, no se implementa.
+- Las API keys se leen de configuración local (variables de entorno o archivo
+  de configuración del usuario). PROHIBIDO persistirlas en la base de datos.
+  PROHIBIDO que aparezcan en logs, trazas o mensajes de error.
 - PII fuera de logs y de trazas de LLM (redacción obligatoria).
-- Derecho de eliminación real y verificable: borrar cuenta = borrar perfil,
-  documentos, embeddings y materiales generados (job asíncrono verificable).
 - PROHIBIDO el scraping de plataformas cuyos ToS lo prohíben (LinkedIn,
   Indeed, OCC, Computrabajo).
 - PROHIBIDO el auto-apply headless con credenciales de usuarios: solo
   assisted-apply con acción final humana.
 
-Racional: el riesgo legal y de baneo de cuentas de usuarios es existencial;
-las fuentes legítimas (APIs, correos de alertas, career pages con robots.txt,
-URL manual) cubren el alcance sin violar ToS.
+Racional: sin backend hospedado no hay base de datos central que filtrar ni
+responsable de datos que vulnerar. La privacidad deja de ser una promesa
+operativa y pasa a ser una propiedad de la arquitectura: el dato está donde el
+usuario lo puso. Lo único que la arquitectura no puede garantizar es la llamada
+al proveedor de LLM, y por eso esa frontera se compensa con divulgación
+explícita: el usuario elige el proveedor, pone su clave y sabe exactamente qué
+sale de su máquina. Las prohibiciones de scraping y auto-apply se conservan
+porque protegen al usuario del baneo de sus propias cuentas, un riesgo que el
+pivote a ejecución local no elimina: lo traslada a su máquina.
 
 ### VI. Calidad verificable (NO NEGOCIABLE)
 
@@ -152,20 +234,35 @@ las evals convierten los cambios de prompt de acto de fe en cambio medible.
 - Una sola base de datos: Postgres 16 + pgvector para todo, incluidos
   embeddings. Sin vector-store aparte.
 - Sin microservicios en v1.
-- Despliegue con Docker Compose sobre VPS (ver ADR-002); sin Kubernetes en v1.
+- Ejecución local con Docker Compose; sin despliegue hospedado en v1. Sin
+  Kubernetes.
+- La fricción de instalación es parte del alcance del producto, no un detalle
+  de operación. Cada servicio que el usuario deba levantar en su máquina reduce
+  la adopción, y debe justificarse frente a la alternativa de no tenerlo.
 - Cada dependencia nueva se justifica en el plan de la feature.
 
 Racional: equipo de 2–3 personas y decenas de usuarios en v1; cada pieza de
-infraestructura extra es fricción sin beneficio a esta escala.
+infraestructura extra es fricción sin beneficio a esta escala. En ejecución
+local esa fricción ya no la absorbe el equipo: la paga cada persona que intenta
+correr Vokara, y quien no logra levantarlo simplemente no lo usa. Un servicio
+de más no es deuda operativa, es un usuario menos.
 
 ### VIII. Observabilidad (NO NEGOCIABLE)
 
 - Toda llamada a LLM se traza con costo, latencia y versión de prompt.
 - Logs estructurados con structlog.
-- Errores capturados en Sentry (backend y frontend).
+- Errores capturados en logs locales estructurados. El envío de errores a un
+  servicio externo (Sentry u otro) está disponible solo bajo el opt-in
+  explícito que define el artículo V, y desactivado por defecto.
 
 Racional: operar un producto LLM sin trazas de costo y latencia es volar a
 ciegas; los datos de tracing son la base para comparar proveedores (ADR-003).
+En ejecución local esas trazas son para el usuario y para quien depure con él,
+no para un panel del proyecto: la observabilidad se conserva entera, cambia
+únicamente hacia dónde puede salir. Un reporte de error arrastra rutas de
+archivo, fragmentos de datos y a veces contenido de prompt, así que enviarlo
+por defecto sería la misma fuga que el art. V prohíbe, entrando por la puerta
+de la operación.
 
 ### IX. Idioma (NO NEGOCIABLE)
 
@@ -188,6 +285,30 @@ consistencia con el ecosistema y las herramientas.
 Racional: el candidato es responsable de lo que se dice en su nombre y es quien
 mejor conoce su historia. El control humano también es la salvaguarda operativa
 que hace viable el modelo assisted-apply del artículo V.
+
+### XI. Portabilidad de proveedor (NO NEGOCIABLE)
+
+- Vokara NO depende de un proveedor de LLM concreto. El adapter del artículo II
+  define CAPACIDADES —salida estructurada, embeddings— y cada proveedor las
+  implementa o declara explícitamente no soportarlas.
+- NINGUNA feature puede asumir un proveedor específico: ni en su lógica, ni en
+  sus prompts, ni en sus tests. Un `if provider == "..."` fuera del adapter es
+  un bug.
+- Si una capacidad requerida no está disponible en el proveedor configurado, la
+  feature degrada de forma EXPLÍCITA E INFORMADA: el usuario ve qué no puede
+  hacerse y por qué. PROHIBIDA la degradación silenciosa y PROHIBIDO el fallo
+  opaco.
+- El usuario puede cambiar de proveedor sin perder sus datos. Los vectores
+  persisten su `embedding_model` y `embedding_dim` (art. II, ADR-003), de modo
+  que cambiar de proveedor implica re-embeber, nunca perder el perfil, los
+  documentos ni el historial.
+
+Racional: la API key la pone el usuario, así que el proveedor lo elige el
+usuario, no el proyecto. Un candidato con acceso a un proveedor y no a otro debe
+poder usar Vokara igual; atarse a uno convertiría una decisión suya en un
+requisito nuestro. La degradación explícita es la contraparte honesta de esa
+libertad: si el proveedor elegido no puede hacer algo, decirlo es parte del
+producto.
 
 ## Restricciones adicionales
 
@@ -225,7 +346,7 @@ que hace viable el modelo assisted-apply del artículo V.
   redefiniciones incompatibles de principios; MINOR para principios o
   secciones nuevas o guía materialmente ampliada; PATCH para aclaraciones y
   correcciones de redacción.
-- Los diez principios fundamentales son NO NEGOCIABLES: no admiten
+- Los once principios fundamentales son NO NEGOCIABLES: no admiten
   excepciones por conveniencia; solo una enmienda formal puede cambiarlos.
 
-**Version**: 1.1.1 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-10
+**Version**: 2.1.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-10
