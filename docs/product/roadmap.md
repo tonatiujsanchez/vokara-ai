@@ -233,7 +233,7 @@ Este check es parte del pipeline, no opcional. En `generated_assets` se persiste
 | Tipado | mypy `--strict` + Pydantic v2 en todas las fronteras | Requisito del proyecto |
 | ORM/DB | SQLAlchemy 2.0 (typed) + Alembic · Postgres 16 + pgvector | Una sola DB para todo, incluidos embeddings; no meter un vector-store aparte en v1 |
 | Colas | Celery + Redis | El equipo ya lo domina (ALPHA) |
-| LLM | **Multi-proveedor detrás del adapter** (`adapters/llm/`), sobre LangChain (structured output) + LangGraph solo en el simulador. **Gemini es el default** vía `langchain-google-genai`, elegido por su capa gratuita (ADR-003). **Soportados:** OpenAI, Anthropic, DeepSeek y Kimi, **sujetos a verificación de capacidades** —salida estructurada y embeddings— pendiente de **ADR-011** | La API key la pone el usuario, así que el proveedor lo elige él (art. XI). Ninguna feature puede asumir un proveedor: un `if provider == "..."` fuera del adapter es un bug. Si el proveedor configurado no soporta una capacidad, la feature degrada de forma **explícita e informada**, nunca en silencio. El adapter cubre también los **embeddings**; cada vector persiste `embedding_model` y `embedding_dim` para permitir cambio de proveedor re-embebiendo, sin perder datos |
+| LLM | **Multi-proveedor detrás del adapter** (`adapters/llm/`), sobre LangChain (structured output) + LangGraph solo en el simulador. **Generación y embeddings se configuran por separado** (ADR-011), cada uno con su proveedor y su API key; pueden ser el mismo o distintos. **Generación:** Gemini (default sugerido por capa gratuita, ADR-003), OpenAI, Anthropic, DeepSeek, Kimi/Moonshot. **Embeddings:** Gemini (default sugerido), OpenAI y los demás que la verificación empírica confirme. Lista **cerrada** en v1 | La API key la pone el usuario, así que el proveedor lo elige él (art. XI). Se separan porque **Anthropic no ofrece embeddings**: amarrarlos dejaría sin matching semántico a quien elija Claude. Las capacidades —salida estructurada nativa, embeddings, dimensión del vector— viven en una **matriz explícita** que declara cada proveedor; ninguna feature consulta el nombre del proveedor, consulta la capacidad, y un `if provider == "..."` fuera del adapter es un bug. Capacidad ausente → degradación **explícita e informada** en el wizard, nunca en silencio. Cada vector persiste `embedding_model` y `embedding_dim`: **cambiar el proveedor de embeddings obliga a re-embeber** y la UI lo advierte antes; cambiar el de generación no persiste nada. `StructuredOutputPort` y `EmbeddingsPort` admiten `base_url` configurable y credencial opcional para que Ollama y compatibles sean una implementación nueva, no un refactor — **no se implementan en v1** |
 | Documentos | python-docx, WeasyPrint o docx→pdf (ya resuelto en ALPHA) | Reuso directo |
 | Email | Lectura IMAP de la etiqueta designada por el usuario, detrás de `EmailPort` (ADR-012) | Opcional. Reuso del know-how de parseo de ALPHA. No hay envío transaccional: sin cuentas no hay verificación ni reset |
 | Calidad | ruff (lint+format), pre-commit, pytest + coverage | |
@@ -428,7 +428,7 @@ Release pública en GitHub, ciclo quincenal de release, y el backlog v1.x priori
 ## 10. Primeros 10 pasos concretos (próximas 2 semanas)
 
 1. ~~Registrar dominio y repos de Vokara (verificar disponibilidad de vokara.com / vokara.ai / vokara.mx y del nombre en redes).~~ ✅
-2. ~~Escribir los ADRs base (001–010, 012) y pivotar la constitución a v2.1.0.~~ ✅ · **Pendiente: ADR-011** — verificación de capacidades por proveedor (salida estructurada y embeddings en OpenAI, Anthropic, DeepSeek y Kimi), que hoy bloquea la fila de LLM de §5.
+2. ~~Escribir los ADRs base (001–012) y pivotar la constitución a v2.1.0.~~ ✅ · **Pendiente: llenar la tabla "Estado de verificación" del ADR-011** — probar empíricamente salida estructurada, respeto de `null` en opcionales, embeddings y dimensión en Gemini, OpenAI, Anthropic, DeepSeek y Kimi. Un proveedor sin verificar no se ofrece en el wizard (§11.2).
 3. Entrevistar 5 personas buscando empleo hoy — validar que el flujo del MVP (Fase 2) es lo que necesitan **y observar a dos de ellas intentando instalarlo**: la fricción de instalación se valida con personas, no con suposiciones (§11).
 4. Solicitar llaves de Adzuna/Jooble/JSearch y evaluar cobertura real de vacantes en México con 20 búsquedas de prueba. **Documentar además cuántos pasos le cuesta a un usuario obtener las suyas**: en local, cada llave la tramita él.
 5. Validar el camino de correo del ADR-012 de punta a punta: crear el filtro y la etiqueta en una cuenta Gmail real, generar una App Password, leer por IMAP **solo esa etiqueta**, y parsear un correo de alerta real de LinkedIn y uno de OCC.
@@ -461,11 +461,16 @@ Al abrir Vokara por primera vez, el usuario entra en un wizard. **No hay registr
 
 **Paso 1 — Divulgación (obligatorio).** Antes de configurar nada, en texto claro y en la pantalla —no en un enlace, no en el README (art. V)—: qué datos se quedan en su máquina, cuál es la **única** excepción (el contenido enviado al proveedor de LLM que él elija), **qué se envía exactamente y en qué momento** (el CV al parsearlo, la JD al parsearla, perfil + JD al generar materiales, la conversación en el simulador), que Vokara **no envía telemetría ni reportes de error a terceros**, y que **sus archivos quedan en claro en el disco** con la recomendación de activar el cifrado de disco del sistema operativo (ADR-007). Se avanza con un acuse explícito.
 
-**Paso 2 — Proveedor de LLM y API key, con preflight de capacidades (obligatorio).**
-- Elección de proveedor con **Gemini preseleccionado** y la razón dicha en la propia pantalla: es el único con capa gratuita suficiente para usar Vokara de verdad sin tarjeta (ADR-003). Los demás aparecen como iguales, no como opciones de segunda.
+**Paso 2 — Proveedores de LLM y API keys, con preflight de capacidades (obligatorio).**
+
+Se configuran **dos proveedores, no uno** (ADR-011): uno para **generación** (salida estructurada) y otro para **embeddings**, cada uno con su propia API key. Pueden ser el mismo o distintos, y la pantalla dice por qué están separados en una línea: no todos los proveedores ofrecen embeddings —**Anthropic no lo hace**—, y amarrarlos dejaría el matching semántico inoperante según a quién eligiera el usuario.
+
+- **Default sugerido: Gemini para ambos**, preseleccionado, con la razón en la propia pantalla —es el único con capa gratuita suficiente para usar Vokara de verdad sin tarjeta (ADR-003)— y **una sola llave** que resuelve el caso común en una elección. Los demás aparecen como iguales, no como opciones de segunda.
+- **Generación:** Gemini, OpenAI, Anthropic, DeepSeek, Kimi/Moonshot. **Embeddings:** Gemini, OpenAI y los demás que la verificación empírica del ADR-011 confirme. Un proveedor sin verificar **no se ofrece en la lista**.
 - Enlace directo a dónde se obtiene la llave de cada proveedor, con los pasos contados.
-- **Preflight al guardar la clave, no en el primer uso real.** Vokara hace una llamada de prueba y verifica las **capacidades** que necesita —salida estructurada y embeddings (art. XI, ADR-011)— antes de dejar avanzar. Los tres resultados posibles son distintos y se comunican distinto: llave válida y completa → adelante; llave válida pero **sin alguna capacidad** → se dice **qué funciones concretas no estarán disponibles y por qué**, y el usuario decide si continúa así o cambia de proveedor (degradación explícita e informada, nunca silenciosa); llave rechazada → mensaje accionable, nunca un stack trace.
-- La clave se guarda en **configuración local**, nunca en la base de datos, y nunca aparece en logs ni en mensajes de error (art. V, §7.2).
+- **Preflight al guardar cada clave, no en el primer uso real.** Vokara hace una llamada de prueba y verifica la **capacidad** que ese proveedor debe cubrir —salida estructurada para el de generación, embeddings y su dimensión para el de embeddings (art. XI, ADR-011)— antes de dejar avanzar. Los tres resultados posibles son distintos y se comunican distinto: llave válida y con la capacidad → adelante; llave válida pero **sin la capacidad** (p. ej. salida estructurada no garantizada) → se dice **qué funciones concretas no estarán disponibles y por qué**, y el usuario decide si continúa así o cambia de proveedor (degradación explícita e informada, nunca silenciosa); llave rechazada → mensaje accionable, nunca un stack trace.
+- Las claves se guardan en **configuración local**, nunca en la base de datos, y nunca aparecen en logs ni en mensajes de error (art. V, §7.2).
+- **Cambiar después el proveedor de embeddings desde Ajustes invalida los vectores ya persistidos** —cambia la dimensión—: la UI lo advierte **antes** de permitir el cambio y ofrece el reprocesamiento. Cambiar el de generación no tiene ese efecto y no se advierte igual, porque no persiste nada.
 
 **Paso 3 — Vincular correo (opcional, y visiblemente opcional).**
 - Se puede **omitir con un clic** y llegar igual al producto completo. La pantalla dice qué se gana vinculando (una fuente de vacantes más rica: LinkedIn, OCC, Computrabajo vía sus correos de alerta) y qué **no** se pierde al omitirlo (todo lo demás: agregadores, URL manual, matching, materiales, preparación).
@@ -474,7 +479,8 @@ Al abrir Vokara por primera vez, el usuario entra en un wizard. **No hay registr
 
 ### 11.3 Transparencia de costo
 
-- **Antes** de pedir la API key, el wizard muestra el **costo estimado por mes de búsqueda activa** para el proveedor seleccionado, con el supuesto de uso a la vista ("~X vacantes analizadas y ~Y materiales generados al mes") para que la cifra sea interpretable y no un número mágico.
+- **Antes** de pedir cada API key, el wizard muestra el **costo estimado por mes de búsqueda activa** del proveedor seleccionado, con el supuesto de uso a la vista ("~X vacantes analizadas y ~Y materiales generados al mes") para que la cifra sea interpretable y no un número mágico.
+- **Generación y embeddings se estiman por separado** (ADR-011), porque sus órdenes de magnitud no se parecen: los embeddings son sustancialmente más baratos. Mostrarlos sumados haría creer que cambiar de proveedor de embeddings mueve la factura, cuando lo que la mueve es la generación.
 - Para Gemini se indica explícitamente **qué cabe dentro de la capa gratuita** y a partir de qué punto se empieza a pagar.
 - Después, el **costo real acumulado** es consultable en la app desde las trazas locales (§5 Infra). El usuario tiene que poder responder "¿cuánto llevo gastado?" sin salir de Vokara.
 - **Kill-switch por configuración** para las funciones caras (generación de materiales, simulador), porque aquí quien paga la inferencia es él y el control debe ser suyo (§9).
@@ -485,7 +491,7 @@ Una pantalla permanente en la app —no solo del wizard— que responde "¿está
 
 - Los cuatro servicios del Compose (`api`, `worker`, `postgres`, `redis`) y su conectividad.
 - Versión de esquema y **migraciones pendientes** tras un `git pull`.
-- Proveedor de LLM configurado, resultado del **preflight de capacidades** y **qué funciones están degradadas** por ello.
+- **Los dos proveedores configurados** —generación y embeddings (ADR-011)—, el resultado del **preflight de capacidades** de cada uno y **qué funciones están degradadas** por ello. Para embeddings, además, el `embedding_model` con el que están hechos los vectores actuales y si coincide con el proveedor configurado: si no coincide, hay reprocesamiento pendiente.
 - Correo vinculado o no, y si la etiqueta configurada existe y es alcanzable.
 - Llaves de agregadores presentes y válidas.
 - Directorio de datos: ruta, espacio disponible y **documentos con `storage_key` cuyo archivo ya no existe** (ADR-007).
@@ -504,7 +510,7 @@ Regla, no aspiración: **todo error que el usuario pueda ver le dice qué pasó,
 | `401 Unauthorized` | "Tu proveedor rechazó la API key. Verifica que la copiaste completa y que sigue activa en [enlace a la consola del proveedor]." |
 | `429 Too Many Requests` | "Alcanzaste el límite de tu capa gratuita de Gemini. Puedes esperar al reinicio de cuota o configurar otro proveedor en Ajustes." |
 | `imaplib.error: AUTHENTICATIONFAILED` | "Gmail rechazó la App Password. Si tu cuenta es de Google Workspace, las App Passwords están deshabilitadas: usa la vía OAuth [enlace]." |
-| `NotImplementedError: embeddings` | "El proveedor que configuraste no ofrece embeddings, así que el matching semántico está desactivado. El matching por reglas sigue funcionando. Para activarlo, cambia de proveedor en Ajustes." |
+| `NotImplementedError: embeddings` | "El proveedor de embeddings que configuraste no ofrece esa capacidad, así que el matching semántico está desactivado. El matching por reglas sigue funcionando, y tu proveedor de generación no se ve afectado. Para activarlo, elige otro proveedor de embeddings en Ajustes." |
 | `FileNotFoundError: /data/...` | "No se encuentra el archivo de tu CV en el directorio de datos. Si moviste o borraste esa carpeta, tu perfil sigue intacto, pero no se puede reprocesar el archivo original." |
 
 Ningún mensaje incluye una API key, una App Password ni PII (§7.2). Los tres errores más probables de la primera ejecución —Docker ausente, puerto ocupado, API key inválida— se prueban a mano en cada release: son los que deciden si alguien se queda o se va.
