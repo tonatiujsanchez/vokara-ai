@@ -2,7 +2,7 @@
 
 > **Vokara** (*vocation* + *radar*) — Encuentra oportunidades que realmente encajan contigo.
 
-**Versión:** 0.3 · **Fecha:** Julio 2026 · **Estado:** Alineado con constitución v1.1.0 y ADR-001..005
+**Versión:** 0.3 · **Fecha:** Julio 2026 · **Estado:** Alineado con constitución v1.1.0 y ADR-001..006
 
 ---
 
@@ -216,7 +216,7 @@ Este check es parte del pipeline, no opcional. En `generated_assets` se persiste
 ### Frontend
 | Capa | Elección | Nota |
 |---|---|---|
-| Base | React 18 + TypeScript + Vite | |
+| Base | React 18 + TypeScript + Vite | SPA; Next.js descartado — ver ADR-006 |
 | Server state | TanStack Query | |
 | Cliente API | Generado desde OpenAPI (`openapi-typescript` u orval) | El tipado back↔front nunca se desincroniza |
 | Formularios | react-hook-form + zod | |
