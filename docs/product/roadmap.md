@@ -2,7 +2,7 @@
 
 > **Vokara** (*vocation* + *radar*) — Encuentra oportunidades que realmente encajan contigo.
 
-**Versión:** 0.2 · **Fecha:** Julio 2026 · **Estado:** Borrador para revisión
+**Versión:** 0.3 · **Fecha:** Julio 2026 · **Estado:** Alineado con constitución v1.1.0 y ADR-001..005
 
 ---
 
@@ -55,7 +55,7 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 ### Pilar 1 — Descubrimiento de vacantes ideales
 
 - **F1.1 [M] Ingesta de CV maestro** — Upload PDF/DOCX → parseo con extracción LLM + salida tipada (Pydantic) que **siembra el perfil maestro**: entradas atómicas referenciables (experiencia, logros, skills, educación, idiomas — ver ADR-005). El usuario **revisa, corrige y enriquece** el perfil sembrado en UI y lo **confirma** antes de continuar (human-in-the-loop: el parseo nunca es perfecto y este gate define la calidad de todo lo demás). El archivo original se conserva como respaldo, no como fuente de verdad.
-- **F1.2 [M] Perfil enriquecido** — Cuestionario corto: objetivo de puesto, salario esperado, ubicación/remoto, industrias, deal-breakers. Normalización de skills contra taxonomía (ESCO o lista propia curada) para que "React.js", "ReactJS" y "React" sean la misma skill.
+- **F1.2 [M] Perfil enriquecido** — Cuestionario corto: objetivo de puesto, salario esperado, ubicación/remoto, industrias, deal-breakers. Normalización de skills contra una **lista propia curada de 200–300 skills** del mercado objetivo, con alias en español e inglés y fallback por similitud de embeddings cuando no hay coincidencia exacta (ADR-004), para que "React.js", "ReactJS" y "React" sean la misma skill — y para que "React Native" no lo sea. ESCO queda como posible importación futura (el esquema `skill_id` + alias es compatible), no como alternativa abierta en v1.
 - **F1.3 [M] Fuentes de vacantes (estrategia multi-canal):**
   1. **APIs de agregadores** (legítimas, con datos de México): Adzuna, Jooble, JSearch (RapidAPI, indexa Google for Jobs). Costo bajo, cobertura amplia.
   2. **Correos de alertas reenviados** — el candidato configura alertas en LinkedIn/OCC/Computrabajo/Indeed y las reenvía (o auto-reenvía) a su dirección Vokara; el sistema parsea las vacantes del correo. **Ventaja del equipo: ya dominan parseo de correos y adjuntos por el proyecto ALPHA.** Canal 100% dentro de los ToS.
@@ -102,7 +102,7 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 | ToS de bolsas de trabajo (scraping/auto-apply) | Legal + baneo de cuentas de usuarios | Estrategia de fuentes legítimas (F1.3); assisted-apply, nunca headless; revisión legal en Fase 0 |
 | Datos personales sensibles (CVs) | LFPDPPP (México) / GDPR si hay usuarios UE | Aviso de privacidad, cifrado en reposo, derecho de eliminación real (borrar = borrar), retención definida, PII fuera de logs |
 | El LLM "mejora" el CV inventando | Daño reputacional grave al usuario y al producto | Verificador de veracidad obligatorio en el pipeline de generación (4.6) |
-| Calidad del parseo de CV variable | Todo el matching se degrada | Human-in-the-loop de corrección (F1.1) + suite de evals con CVs reales (sección 6.4) |
+| Calidad del parseo de CV variable | Todo el matching se degrada | Human-in-the-loop de corrección (F1.1) + suite de evals con golden set propio (§6.4) |
 | Costo LLM por usuario | Unit economics | Cachear parseos de JD (una vacante se parsea una vez para todos), embeddings baratos, modelos pequeños para clasificación, modelo grande solo en generación de materiales |
 | Cobertura de vacantes insuficiente en México | Producto se siente vacío | Canal de correos de alertas (F1.3.2) garantiza cobertura de LinkedIn/OCC/Computrabajo sin scrapearlos |
 
@@ -115,7 +115,7 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 La lección de ALPHA aplica aquí: **no todo debe ser "agéntico"**. 
 
 - **Pipelines** (ingesta, parseo, matching, generación de materiales): flujos deterministas y testeables donde el LLM es un componente con entrada/salida tipada (structured output), no un agente que decide. Predecible, barato, debuggeable.
-- **Agente conversacional** (solo el simulador de entrevistas y el asistente de preparación): aquí sí hay estado, turnos y decisiones del modelo → LangGraph con checkpointer.
+- **Agente conversacional** (**únicamente** el simulador de entrevistas — es el solo componente conversacional/agéntico permitido por la constitución, art. III): aquí sí hay estado, turnos y decisiones del modelo → LangGraph con checkpointer.
 
 ### 4.2 Diagrama lógico
 
@@ -154,7 +154,7 @@ La lección de ALPHA aplica aquí: **no todo debe ser "agéntico"**.
 - `users` — auth, plan.
 - `candidate_profiles` — 1:1 con user; perfil maestro versionado (ADR-005); headline, años de experiencia, skills normalizadas, idiomas, expectativa salarial, preferencias (remoto, ubicaciones, industrias), embedding del perfil.
 - `profile_entries` — entradas atómicas referenciables del perfil maestro (experiencia, logro, educación, skill, certificación, idioma, proyecto, historia STAR), cada una con `id` propio; sustentan la trazabilidad por `source_id` de los materiales generados.
-- `documents` — CVs originales y versiones generadas (tipo, storage_url, hash).
+- `documents` — CVs originales y versiones generadas (tipo, storage_url, hash) y **estado de disponibilidad del binario** (`disponible` | `eliminado_por_candidato` | `purgado_por_retencion`, con fecha y causa). Un documento sin binario conserva su registro y las referencias de las entradas que sembró, pero ya no admite reprocesamiento ni fusión (§7).
 - `job_sources` — configuración por canal (api | email_alert | career_page | manual).
 - `companies` — nombre, dominio, dossier (jsonb), last_researched_at.
 - `job_postings` — esquema canónico: título, company_id, descripción cruda, requisitos estructurados (jsonb, cacheado del parseo LLM), salario min/max, ubicación, tipo remoto, seniority, fuente, URL externa, dedup_hash, embedding (pgvector).
@@ -190,7 +190,11 @@ Ventaja de este diseño: el ranking es barato (embeddings + reglas), auditable, 
 
 ### 4.6 Guardrail de veracidad (no negociable)
 
-Después de generar cualquier CV sastre o carta: un paso verificador compara cada afirmación del material generado contra el perfil base y responde tipado: `{afirmaciones_sin_sustento: [...]}`. Si hay alguna → se regenera con la restricción o se marca para revisión del usuario. Este check es parte del pipeline, no opcional, y su resultado se guarda en `generated_assets`.
+Después de generar cualquier material (CV sastre, carta, mensaje, follow-up, nota), un paso verificador exige que **cada afirmación referencie el `profile_entry` del perfil maestro que la sustenta** (`source_id`). No es un juicio semántico de un modelo: es una comprobación de trazabilidad determinista — el `source_id` existe y es válido, o no existe. Barata, testeable con unit tests y alineada al principio de determinismo (§4.1, constitución art. III).
+
+Una afirmación sin `source_id` válido **no llega al usuario**: se bloquea y se regenera con la restricción, o se marca para revisión humana. **Reformular una entrada es válido; exagerarla no** — "participé en" no puede convertirse en "lideré" aunque el `source_id` sea correcto (ver §6.4).
+
+Este check es parte del pipeline, no opcional. En `generated_assets` se persisten el resultado del verificador, las referencias `source_id` por afirmación y la **versión del perfil maestro** con la que se produjo el material, para auditoría y regeneración. Detalle y alternativas descartadas en **ADR-005**.
 
 ---
 
@@ -204,7 +208,7 @@ Después de generar cualquier CV sastre o carta: un paso verificador compara cad
 | Tipado | mypy `--strict` + Pydantic v2 en todas las fronteras | Requisito del proyecto |
 | ORM/DB | SQLAlchemy 2.0 (typed) + Alembic · Postgres 16 + pgvector | Una sola DB para todo, incluidos embeddings; no meter un vector-store aparte en v1 |
 | Colas | Celery + Redis | El equipo ya lo domina (ALPHA) |
-| LLM | Adapter propio sobre LangChain (structured output) + LangGraph solo simulador | Proveedor intercambiable desde el día 1 |
+| LLM | Adapter propio sobre LangChain (structured output) + LangGraph solo simulador; proveedor inicial **Google Gemini** vía `langchain-google-genai` (ADR-003) | Proveedor intercambiable desde el día 1. El adapter cubre también los **embeddings**; cada vector persiste `embedding_model` y `embedding_dim` para permitir migración de proveedor sin pérdida de datos |
 | Documentos | python-docx, WeasyPrint o docx→pdf (ya resuelto en ALPHA) | Reuso directo |
 | Email inbound | Parser de correos de alertas | Reuso del know-how de ALPHA |
 | Calidad | ruff (lint+format), pre-commit, pytest + coverage | |
@@ -220,7 +224,7 @@ Después de generar cualquier CV sastre o carta: un paso verificador compara cad
 | Testing | Vitest + React Testing Library + Playwright (e2e) | |
 
 ### Infra
-Docker multi-stage · Docker Compose (dev) · GitHub Actions (CI/CD) · Staging + Prod en PaaS (Railway/Fly/Render) **o** el K8s que ya operan — recomendación honesta: para un equipo de 2-3 personas, empezar en PaaS y migrar a K8s solo cuando el volumen lo pida; K8s desde el día 1 es fricción sin beneficio a esta escala · Sentry (errores) · Langfuse o LangSmith (trazas y costos LLM) · Logs estructurados (structlog).
+Docker multi-stage · **Docker Compose sobre el VPS Hostinger existente** para dev, staging y prod, separados por proyecto Compose y base de datos distintas (ADR-002); reverse proxy con TLS automático (Caddy o nginx) sirviendo también el frontend estático · **Sin Kubernetes en v1** — sobredimensionado para la escala esperada; se reevalúa contra el umbral documentado en ADR-002 · GitHub Actions (CI/CD, deploy por SSH) · Sentry (errores) · Langfuse o LangSmith (trazas y costos LLM) · Logs estructurados (structlog).
 
 ### 5.1 Estructura del monorepo
 
@@ -259,8 +263,10 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
    - Adapters de fuentes: fixtures grabadas con VCR.py/respx — los tests no golpean APIs externas y detectan cuando una fuente cambia su formato.
 3. **Frontend:** Vitest/RTL por feature; Playwright para los 3 flujos críticos (onboarding → match → generar materiales; tracker; simulador).
 4. **Evals de LLM (tan importantes como los tests):**
-   - Golden set: 30–50 CVs reales anonimizados + 50 JDs etiquetadas a mano.
+   - Golden set: 30–50 CVs **propios del equipo, de voluntarios con consentimiento específico, o sintéticos** + 50 JDs etiquetadas a mano.
+   - **El golden set NUNCA incluye CVs de usuarios reales del producto** (feature 001, FR-033a). Usar material de usuarios reales para evals, golden set o ajuste de prompts requeriría un **ADR propio** y un **consentimiento opt-in explícito, separado del consentimiento de uso del servicio y revocable** (FR-033b). No se habilita por consentimiento general del servicio ni por un cambio del aviso de privacidad.
    - Métricas: F1 de extracción de campos del CV; precisión@10 del ranking contra etiquetas humanas; tasa de detección del verificador de veracidad (con casos trampa sembrados).
+   - **Casos de exageración como fallo:** las evals del verificador incluyen reformulaciones que inflan el hecho original aunque el `source_id` sea válido ("participé en" → "lideré", "apoyé" → "diseñé", métricas infladas). Detectarlas es parte del criterio de aprobación, no un extra (§4.6, constitución art. IV).
    - Corren en CI en cada cambio de prompt/modelo → cambiar un prompt deja de ser un acto de fe.
 5. **Definition of Done por feature:** código tipado + tests + eval (si toca LLM) + migración reversible + entrada en docs/adr si hubo decisión de arquitectura.
 
@@ -271,9 +277,16 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
 - Aviso de privacidad y consentimiento explícito (LFPDPPP); los CVs son datos personales.
 - Cifrado en tránsito (TLS) y en reposo (storage cifrado para documentos).
 - Derecho de eliminación real: borrar cuenta = borrar perfil, documentos, embeddings y materiales generados (job asíncrono verificable).
+- **Ciclo de vida del CV original** (decidido en la feature 001; ver `specs/001-candidate-onboarding/spec.md`):
+  - **Borrado manual por el candidato:** puede eliminar su archivo sin eliminar el perfil que sembró, siempre que exista al menos una versión confirmada del perfil. Antes de confirmar se le advierte que pierde la capacidad de reprocesar y de fusionar contra ese archivo.
+  - **Purga automática por retención:** tras **12 meses de inactividad de la cuenta** —no de tiempo desde la subida—, con aviso previo al candidato; cualquier actividad de la cuenta reinicia el contador. El plazo es **configurable, nunca una constante en código**. El perfil, sus entradas y sus versiones sobreviven a la purga.
+  - **Eliminación de cuenta:** inmediata e irreversible, sin ventana de gracia. Exige confirmación escrita (el correo de la cuenta o una palabra de confirmación), no solo un botón, y antes de confirmar se ofrece exportar el archivo original y el perfil completo en formato consultable.
+  - En los tres casos se elimina el **binario del storage** y el registro en `documents` queda marcado con la causa.
+- **Usos autorizados del CV conservado:** respaldo, descarga por el candidato y reprocesamiento **solo a petición explícita**. El sistema puede sugerir reprocesar con un aviso pasivo en la UI del perfil (desactivable), nunca por correo ni notificación, y nunca re-siembra el perfil por iniciativa propia.
 - PII nunca en logs ni en trazas LLM sin redacción.
-- Secrets en el gestor del PaaS/K8s, jamás en repo. Rotación de llaves de APIs de fuentes.
-- Rate limiting y auth (JWT con refresh; o Clerk/Auth0 para acelerar la Fase 1 — decisión en ADR-001).
+- Secretos gestionados en el VPS como variables de entorno fuera del repo (`.env` nunca se commitea; `.env.example` sí, con valores dummy); los valores reales se sincronizan entre máquinas por gestor de contraseñas. Rotación de llaves de APIs de fuentes.
+- **Autenticación con JWT propio** (ADR-001): Argon2id para contraseñas, access token de vida corta, refresh token opaco con **rotación** y detección de reuso (revoca la familia completa), **revocación de `jti` en Redis** con TTL igual al `exp`; refresh en cookie `httpOnly`/`Secure`/`SameSite=Lax` y access token en memoria del frontend.
+- Rate limiting en `/auth/login`, `/auth/register` y `/auth/reset`, con backoff por IP y por cuenta.
 
 ---
 
@@ -282,7 +295,7 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
 > Supuesto: equipo de 2–3 personas (1 backend, 1 frontend/fullstack, producto compartido). Las duraciones son estimaciones honestas, no promesas.
 
 ### Fase 0 — Descubrimiento y especificación (1–2 semanas)
-**Entregables:** documento de specs cerrado (este roadmap refinado), 5 entrevistas con candidatos reales buscando empleo, revisión legal de fuentes de datos y aviso de privacidad, wireframes de los 5 flujos clave, golden set inicial (10 CVs + 20 JDs), ADRs 001–004 (auth, PaaS vs K8s, proveedor LLM, taxonomía de skills).
+**Entregables:** documento de specs cerrado (este roadmap refinado), 5 entrevistas con candidatos reales buscando empleo, revisión legal de fuentes de datos y aviso de privacidad, wireframes de los 5 flujos clave, golden set inicial (10 CVs + 20 JDs), ADRs 001–005 (auth, hosting, proveedor LLM, taxonomía de skills, perfil maestro).
 **Criterio de salida:** alcance MoSCoW firmado; nadie discute qué es v1 durante el desarrollo.
 
 ### Fase 1 — Fundaciones (1–2 semanas)
@@ -329,13 +342,14 @@ Lanzamiento público, ciclo quincenal de release, y el backlog v1.x priorizado p
 
 ## 10. Primeros 10 pasos concretos (próximas 2 semanas)
 
-1. Registrar dominio y repos de Vokara (verificar disponibilidad de vokara.com / vokara.ai / vokara.mx y del nombre en redes).
-2. Escribir ADR-001 a 004 (auth, hosting, proveedor LLM, taxonomía de skills).
+1. ~~Registrar dominio y repos de Vokara (verificar disponibilidad de vokara.com / vokara.ai / vokara.mx y del nombre en redes).~~ ✅
+2. ~~Escribir ADR-001 a 005 (auth, hosting, proveedor LLM, taxonomía de skills, perfil maestro).~~ ✅
 3. Entrevistar 5 personas buscando empleo hoy — validar que el flujo del MVP (Fase 2) es lo que necesitan.
 4. Solicitar llaves de Adzuna/Jooble/JSearch y evaluar cobertura real de vacantes en México con 20 búsquedas de prueba.
 5. Configurar el buzón inbound y validar el parseo de un correo de alerta real de LinkedIn y uno de OCC.
-6. Armar el golden set inicial (10 CVs anonimizados + 20 JDs etiquetadas).
-7. Levantar el monorepo con el tooling de la Fase 1.
+6. Armar el golden set inicial (10 CVs propios, de voluntarios con consentimiento específico, o sintéticos + 20 JDs etiquetadas). Nunca CVs de usuarios del producto (§6.4).
+7a. ~~Inicializar el repositorio (Spec Kit, constitución, ADRs, roadmap).~~ ✅
+7b. Levantar el monorepo con el tooling de la Fase 1 (`backend/`, `frontend/`, `infra/`, ruff, mypy strict, pre-commit, CI verde, deploy a staging).
 8. Wireframes de: onboarding, lista de matches, detalle de vacante con score, kanban, workspace de preparación.
 9. Redactar aviso de privacidad y flujo de consentimiento.
 10. Definir el presupuesto de costo LLM objetivo por usuario activo/mes.
