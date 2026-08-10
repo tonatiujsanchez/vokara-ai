@@ -1,6 +1,20 @@
 <!--
 Sync Impact Report
 ==================
+- Version change: 1.1.0 → 1.1.1 (PATCH: corrección de redacción, sin cambio de
+  principios)
+- Principios: sin cambios. Los diez principios fundamentales permanecen
+  idénticos en texto y en alcance.
+- Sección modificada: "Restricciones adicionales" — se elimina la enumeración
+  de ADRs específicos (001–004) y se sustituye por una referencia genérica a
+  `docs/adr/`. Motivo: la lista se desfasaba cada vez que se añadía un ADR (ya
+  omitía el 005 y el 006); la regla vinculante no depende de qué ADRs existan
+  hoy.
+- Deferred items / TODOs: ninguno.
+- Templates dependientes: sin cambios; plan/spec/tasks leen esta constitución
+  en runtime.
+
+Historial previo (v1.1.0, enmienda por ADR-005):
 - Version change: 1.0.0 → 1.1.0 (MINOR: guía material ampliada, principio nuevo)
 - Principio añadido: X. Control humano
 - Principio modificado: IV. Veracidad no negociable (define perfil maestro y
@@ -179,10 +193,8 @@ que hace viable el modelo assisted-apply del artículo V.
 
 - La fuente de verdad de producto es `docs/product/roadmap.md`; el alcance de
   v1 sigue su priorización MoSCoW y su anti-alcance (sección 1.4).
-- Las decisiones de arquitectura viven en `docs/adr/` (ADR-001 auth JWT
-  propio, ADR-002 VPS + Docker Compose, ADR-003 Gemini detrás del adapter
-  LLM, ADR-004 taxonomía de skills propia). PROHIBIDO contradecirlas sin un
-  ADR nuevo que las reemplace.
+- Las decisiones de arquitectura viven en `docs/adr/` y son vinculantes.
+  PROHIBIDO contradecirlas sin un ADR nuevo que las reemplace.
 - Stack fijado por el roadmap (sección 5): Python 3.12 + FastAPI + SQLAlchemy
   2.0 + Alembic + Celery/Redis en backend; React 18 + TypeScript + Vite +
   TanStack Query en frontend. Cambios de stack requieren ADR.
@@ -216,4 +228,4 @@ que hace viable el modelo assisted-apply del artículo V.
 - Los diez principios fundamentales son NO NEGOCIABLES: no admiten
   excepciones por conveniencia; solo una enmienda formal puede cambiarlos.
 
-**Version**: 1.1.0 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-09
+**Version**: 1.1.1 | **Ratified**: 2026-08-09 | **Last Amended**: 2026-08-10
