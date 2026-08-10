@@ -2,7 +2,7 @@
 
 > **Vokara** (*vocation* + *radar*) — Encuentra oportunidades que realmente encajan contigo.
 
-**Versión:** 0.3 · **Fecha:** Julio 2026 · **Estado:** Alineado con constitución v1.1.0 y ADR-001..006
+**Versión:** 0.4 · **Fecha:** Agosto 2026 · **Estado:** Alineado con constitución v2.1.0 y ADR-001..012
 
 ---
 
@@ -25,6 +25,8 @@ Este propósito se descompone en **4 pilares funcionales** que estructuran todo 
 
 - **Primario:** profesionistas en México buscando empleo activamente (tech, administrativo, ventas, marketing). Español como idioma principal, inglés como secundario.
 - **Secundario (fase posterior):** recién egresados; personas cambiando de carrera.
+- **Comunidad de contribuidores:** al distribuirse como software open source (AGPL-3.0, ADR-010), el público incluye a programadores que corren Vokara, reportan issues y contribuyen código. No son un canal de marketing: son parte del producto, y la calidad del repositorio —README, tests, ADRs, facilidad de levantar el entorno— es lo que los habilita o los expulsa.
+- **Modo de distribución:** Vokara **no se contrata, se ejecuta**. Cada persona clona el repositorio, lo levanta en su máquina con Docker Compose y aporta su propia API key de LLM (ADR-009). No hay registro ni cuentas (ADR-008): la instancia sirve a una sola persona, la que la instaló. Esto convierte la **fricción de instalación** en un problema de producto de primer nivel (art. VII, §11).
 - **No objetivo en v1:** reclutadores/empresas (eso sería otro producto), mercados fuera de LATAM/US-remote.
 
 ### 1.3 Métricas de éxito
@@ -45,6 +47,7 @@ Definir esto desde el día 1 evita meses perdidos:
 2. **No inventa experiencia ni habilidades.** Reorganiza, reformula y prioriza lo que el candidato realmente tiene. Hay un verificador automático que bloquea afirmaciones sin sustento.
 3. **No promete empleo.** Es un multiplicador de esfuerzo, no una garantía.
 4. **No scrapea plataformas que lo prohíben** (LinkedIn search, Indeed search). La estrategia de fuentes (sección 2, F1.3) se diseña alrededor de canales legítimos.
+5. **No es un servicio hospedado. Vokara no aloja datos de nadie.** No hay servidor del proyecto, ni cuentas, ni base de datos central (ADR-009). Los CVs, el perfil maestro y los materiales generados viven en la máquina de cada persona. La única salida de datos es la llamada al proveedor de LLM que el propio usuario configuró, y se divulga explícitamente (§7).
 
 ---
 
@@ -58,12 +61,15 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 - **F1.2 [M] Perfil enriquecido** — Cuestionario corto: objetivo de puesto, salario esperado, ubicación/remoto, industrias, deal-breakers. Normalización de skills contra una **lista propia curada de 200–300 skills** del mercado objetivo, con alias en español e inglés y fallback por similitud de embeddings cuando no hay coincidencia exacta (ADR-004), para que "React.js", "ReactJS" y "React" sean la misma skill — y para que "React Native" no lo sea. ESCO queda como posible importación futura (el esquema `skill_id` + alias es compatible), no como alternativa abierta en v1.
 - **F1.3 [M] Fuentes de vacantes (estrategia multi-canal):**
   1. **APIs de agregadores** (legítimas, con datos de México): Adzuna, Jooble, JSearch (RapidAPI, indexa Google for Jobs). Costo bajo, cobertura amplia.
-  2. **Correos de alertas reenviados** — el candidato configura alertas en LinkedIn/OCC/Computrabajo/Indeed y las reenvía (o auto-reenvía) a su dirección Vokara; el sistema parsea las vacantes del correo. **Ventaja del equipo: ya dominan parseo de correos y adjuntos por el proyecto ALPHA.** Canal 100% dentro de los ToS.
+  2. **Correos de alertas en la bandeja del propio candidato (opcional, ADR-012)** — no existe "dirección Vokara": no hay backend que reciba correo. El candidato configura sus alertas en LinkedIn/OCC/Computrabajo/Indeed, crea en su Gmail un **filtro que las etiquete**, y vincula su cuenta en Vokara con **App Password + IMAP**. Vokara lee **únicamente la etiqueta que él designe**, nunca la bandeja completa, y parsea las vacantes del correo. **Ventaja del equipo: ya dominan parseo de correos y adjuntos por el proyecto ALPHA.** Canal 100% dentro de los ToS.
+     - **Es opcional y su ausencia no bloquea nada:** sin vincular correo, el canal de APIs de agregadores (1), las career pages (3) y la URL manual (4) siguen funcionando, y el resto del producto —perfil, matching, materiales, preparación— está completo. Lo que se pierde son fuentes automáticas, y se dice de forma explícita, nunca en silencio (art. XI).
+     - **Divulgación obligatoria al configurarlo:** una App Password da acceso a **toda** la bandeja; la restricción por etiqueta es una disciplina de Vokara verificada por tests del adapter, no un permiso que Google imponga. El usuario ve esto al vincular, no enterrado en la documentación. La App Password se lee de configuración local y nunca se persiste en base de datos ni aparece en logs (art. V).
+     - **Limitación registrada:** las cuentas de Google Workspace y las de Protección Avanzada no admiten App Passwords. Para ellas la vía es OAuth con proyecto propio de Google Cloud, documentada como opción avanzada.
   3. **Career pages directas** — scraping respetuoso (robots.txt) de páginas de carreras de empresas objetivo; los boards de Greenhouse/Lever/Workable exponen JSON público por empresa.
   4. **URL manual** — el usuario pega cualquier URL de vacante y Vokara la analiza al momento.
 - **F1.4 [M] Normalización y deduplicación** — Toda vacante, venga de donde venga, se convierte a un esquema canónico `JobPosting`; dedup por hash de (empresa + título normalizado + similitud de descripción) para no mostrar la misma vacante 4 veces.
 - **F1.5 [M] Motor de matching con score explicable** — Detalle en sección 4.5. Cada match muestra: score global, sub-scores (cobertura de requisitos obligatorios, semántica, seniority, salario, ubicación), brechas ("te faltan X, Y") y un "por qué encajas" de 2 líneas generado desde los sub-scores (no texto libre inventado).
-- **F1.6 [S] Alertas y digest** — Correo/notificación diaria o semanal con los nuevos matches sobre umbral de score.
+- **F1.6 [S] Alertas y digest** — Resumen de los nuevos matches sobre umbral de score. **No hay servidor siempre encendido:** el scheduler corre **al arrancar la app** y calcula lo pendiente desde `last_run_at` (¿tocaba digest ayer y la máquina estaba apagada? se genera ahora, no se pierde ni se dispara siete veces). El digest se muestra en la UI al abrir Vokara; enviarlo por correo es opcional y usa la cuenta que el propio candidato vinculó (F1.3.2). El diseño debe ser explícito sobre huecos: el usuario ve "última revisión: hace 3 días", no un silencio indistinguible de "no hay nada nuevo".
 - **F1.7 [C] Feedback loop de matching** — Thumbs up/down por vacante ajusta pesos del ranking por usuario.
 
 ### Pilar 2 — Maximizar entrevistas
@@ -72,7 +78,7 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 - **F2.2 [M] Verificación ATS** — El DOCX generado se re-parsea con el mismo parser de F1.1; si se pierden campos (tablas raras, columnas), se alerta. Chequeo de keywords de la JD presentes/ausentes.
 - **F2.3 [M] Carta de presentación por vacante** — Personalizada con empresa + rol + 2-3 puntos de match concretos.
 - **F2.4 [M] Tracker de aplicaciones (kanban)** — Máquina de estados: `DESCUBIERTA → GUARDADA → MATERIALES_LISTOS → APLICADA → SCREENING → ENTREVISTA(n) → OFERTA → NEGOCIACIÓN → ACEPTADA / RECHAZADA / SIN_RESPUESTA / RETIRADA`. Cada transición se registra con timestamp (alimenta las métricas del embudo personal).
-- **F2.5 [S] Follow-ups automáticos sugeridos** — Si una aplicación lleva N días sin respuesta, Vokara redacta el follow-up y lo deja listo para enviar (o lo envía si el usuario activó ese permiso para su propio correo).
+- **F2.5 [S] Follow-ups sugeridos** — Si una aplicación lleva N días sin respuesta, Vokara redacta el follow-up y lo deja listo para enviar. Igual que F1.6, la detección corre **al arrancar la app**, no en un cron continuo: se evalúa `next_action_at` de cada aplicación contra la fecha actual y se recuperan todos los vencimientos ocurridos mientras la máquina estuvo apagada, sin duplicar los ya atendidos. El envío nunca es automático: Vokara prepara, el candidato da el clic final (art. X).
 - **F2.6 [S] Mensajes a reclutadores** — Plantillas personalizadas para contacto en frío (LinkedIn/correo) con el ángulo de match específico. El envío es manual (copiar/pegar o mailto), no automatizado.
 - **F2.7 [S] Analítica del embudo personal** — "Aplicaste a 40, respondieron 6, entrevistas 3": dónde se cae el candidato y sugerencias (¿CV?, ¿tipo de vacante?, ¿seniority mal calibrado?).
 - **F2.8 [C] Extensión de navegador para assisted-apply** — Autollenado de formularios de aplicación con los datos del perfil (así lo resuelven Simplify/Teal). Es la forma correcta y segura de acelerar el apply sin violar ToS. Proyecto propio; va en v1.x.
@@ -100,11 +106,11 @@ Prioridad MoSCoW: **[M]** must-have v1 · **[S]** should-have v1 · **[C]** coul
 | Riesgo | Impacto | Mitigación |
 |---|---|---|
 | ToS de bolsas de trabajo (scraping/auto-apply) | Legal + baneo de cuentas de usuarios | Estrategia de fuentes legítimas (F1.3); assisted-apply, nunca headless; revisión legal en Fase 0 |
-| Datos personales sensibles (CVs) | LFPDPPP (México) / GDPR si hay usuarios UE | Aviso de privacidad, cifrado en reposo, derecho de eliminación real (borrar = borrar), retención definida, PII fuera de logs |
+| **Fricción de instalación** — el público objetivo no es exclusivamente técnico y `docker compose up` ya es una barrera | Adopción: quien no logra levantarlo no usa Vokara. Es el riesgo nº 1 del modelo local-first (ADR-009) | Instalación de un comando; wizard de configuración en la primera ejecución; pantalla de diagnóstico que dice qué falta y cómo arreglarlo; guía probada en Windows (WSL2), macOS y Linux. Alcance de producto, no de operación (art. VII, §11) |
+| **El usuario paga su propia inferencia** y el público objetivo puede estar sin ingresos | Abandono al llegar al paso de la API key, o costo inesperado tras usarlo | Gemini por defecto por su capa gratuita —no es una ventaja de costo, es la diferencia entre poder usarlo y no (ADR-003)—; costo estimado visible **antes** de configurar el proveedor; caché agresivo de parseos (una JD se parsea una vez), embeddings baratos, modelo grande solo en generación de materiales |
 | El LLM "mejora" el CV inventando | Daño reputacional grave al usuario y al producto | Verificador de veracidad obligatorio en el pipeline de generación (4.6) |
 | Calidad del parseo de CV variable | Todo el matching se degrada | Human-in-the-loop de corrección (F1.1) + suite de evals con golden set propio (§6.4) |
-| Costo LLM por usuario | Unit economics | Cachear parseos de JD (una vacante se parsea una vez para todos), embeddings baratos, modelos pequeños para clasificación, modelo grande solo en generación de materiales |
-| Cobertura de vacantes insuficiente en México | Producto se siente vacío | Canal de correos de alertas (F1.3.2) garantiza cobertura de LinkedIn/OCC/Computrabajo sin scrapearlos |
+| Cobertura de vacantes insuficiente en México | Producto se siente vacío | El canal de correos de alertas (F1.3.2) da cobertura de LinkedIn/OCC/Computrabajo sin scrapearlos, pero es **opcional**: quien no vincule correo depende de agregadores + URL manual, y ese escenario degradado debe ser usable por sí solo |
 
 ---
 
@@ -119,42 +125,61 @@ La lección de ALPHA aplica aquí: **no todo debe ser "agéntico"**.
 
 ### 4.2 Diagrama lógico
 
+No hay capa hospedada: **todo lo que aparece dentro del marco corre en la máquina del usuario** (ADR-009). Lo único que sale son las llamadas a servicios externos, y siempre con credenciales del propio usuario.
+
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     FRONTEND (React + TS)                    │
-│  Onboarding · Matches · Kanban · Prep Workspace · Analytics │
-└──────────────────────────┬──────────────────────────────────┘
-                           │ REST (OpenAPI) + SSE para el simulador
-┌──────────────────────────▼──────────────────────────────────┐
-│                    API (FastAPI + Pydantic v2)               │
-│   routers → services (dominio) → repositories (DB)          │
-└───────┬───────────────────────────────┬─────────────────────┘
-        │                               │
-┌───────▼────────┐              ┌───────▼─────────────────────┐
-│  Postgres 16   │              │   Workers (Celery + Redis)   │
-│  + pgvector    │              │  · ingesta de fuentes (cron) │
-│  (perfiles,    │              │  · parseo CV/JD (LLM)        │
-│   vacantes,    │              │  · matching batch            │
-│   embeddings,  │              │  · generación de materiales  │
-│   tracker)     │              │  · digest de alertas         │
-└────────────────┘              └───────┬─────────────────────┘
-                                        │
-                        ┌───────────────▼───────────────┐
-                        │       ADAPTERS (puertos)       │
-                        │ · LLM provider (intercambiable)│
-                        │ · Fuentes: Adzuna/Jooble/JSearch│
-                        │ · Email inbound (alertas)      │
-                        │ · Storage (S3-compatible)      │
-                        │ · Export DOCX/PDF              │
-                        └────────────────────────────────┘
+╔══════════════════════════════════════════════════════════════════════╗
+║  MÁQUINA DEL USUARIO — todo corre aquí (Docker Compose, ADR-009)     ║
+║  Puertos publicados solo en 127.0.0.1 (ADR-008)                      ║
+║                                                                      ║
+║  ┌────────────────────────────────────────────────────────────────┐  ║
+║  │            FRONTEND (React + TS) — 127.0.0.1:5173              │  ║
+║  │   Onboarding · Matches · Kanban · Prep Workspace · Analytics   │  ║
+║  └────────────────────────────────────────────────────────────────┘  ║
+║                                  │ REST (OpenAPI) + SSE (simulador)  ║
+║  ┌───────────────────────────────▼────────────────────────────────┐  ║
+║  │           API (FastAPI + Pydantic v2) — 127.0.0.1:8000         │  ║
+║  │      routers → services (dominio) → repositories (DB)          │  ║
+║  │      sin autenticación; candidate_id local fijo (ADR-008)      │  ║
+║  └────────────────────────────────────────────────────────────────┘  ║
+║      │                           │                                   ║
+║  ┌───▼────────────────┐   ┌──────▼──────────────────────┐            ║
+║  │  Postgres 16       │   │  Workers (Celery + Redis)   │            ║
+║  │  + pgvector        │   │  · ingesta de fuentes       │            ║
+║  │  perfil, vacantes, │   │  · parseo CV/JD (LLM)       │            ║
+║  │  embeddings,       │   │  · matching batch           │            ║
+║  │  tracker           │   │  · generación de materiales │            ║
+║  │  (sin publicar)    │   │  · scheduler al arranque    │            ║
+║  └────────────────────┘   └─────────────────────────────┘            ║
+║                                  │                                   ║
+║        ┌─────────────────────────▼────────────────────────────┐      ║
+║        │                ADAPTERS (puertos)                    │      ║
+║        │  · LLM · Fuentes · Email · Storage · Export DOCX/PDF │      ║
+║        │  Todos apuntan a las credenciales del propio usuario │      ║
+║        └──────────────────────────────────────────────────────┘      ║
+║        │                         │                                   ║
+║      ┌─▼────────────────────┐    │                                   ║
+║      │  Filesystem local    │    │                                   ║
+║      │  CVs y materiales    │    │                                   ║
+║      │  en claro (ADR-007)  │    │                                   ║
+║      └──────────────────────┘    │                                   ║
+║                                  │                                   ║
+╚══════════════════════════════════╩═══════════════════════════════════╝
+                                  │  única salida de datos de la máquina
+                      ┌───────────▼──────────────────────────────────────────┐
+                      │  SERVICIOS EXTERNOS QUE CONFIGURA EL USUARIO         │
+                      │  · Proveedor LLM con SU API key (Gemini por defecto) │
+                      │  · APIs de agregadores con SUS llaves                │
+                      │  · SU Gmail vía IMAP + App Password (ADR-012)        │
+                      └──────────────────────────────────────────────────────┘
 ```
 
 ### 4.3 Modelo de datos (entidades núcleo)
 
-- `users` — auth, plan.
-- `candidate_profiles` — 1:1 con user; perfil maestro versionado (ADR-005); headline, años de experiencia, skills normalizadas, idiomas, expectativa salarial, preferencias (remoto, ubicaciones, industrias), embedding del perfil.
+- **Sin tabla `users`** (ADR-008): no hay auth ni planes. Se conserva un `candidate_id` con **valor local fijo** asignado en la migración inicial, que la capa de API resuelve desde configuración local —nunca lo envía el cliente— y por el que **toda query de repositorio filtra desde la primera línea de código**. Es lo que permitiría añadir autenticación encima en una eventual versión hospedada sin reescribir la capa de datos.
+- `candidate_profiles` — perfil maestro versionado (ADR-005); headline, años de experiencia, skills normalizadas, idiomas, expectativa salarial, preferencias (remoto, ubicaciones, industrias), embedding del perfil.
 - `profile_entries` — entradas atómicas referenciables del perfil maestro (experiencia, logro, educación, skill, certificación, idioma, proyecto, historia STAR), cada una con `id` propio; sustentan la trazabilidad por `source_id` de los materiales generados.
-- `documents` — CVs originales y versiones generadas (tipo, storage_url, hash) y **estado de disponibilidad del binario** (`disponible` | `eliminado_por_candidato` | `purgado_por_retencion`, con fecha y causa). Un documento sin binario conserva su registro y las referencias de las entradas que sembró, pero ya no admite reprocesamiento ni fusión (§7).
+- `documents` — CVs originales y versiones generadas (tipo, `storage_key` del filesystem local, hash) y **estado de disponibilidad del binario** (`disponible` | `eliminado_por_candidato` | `purgado_por_retencion`, con fecha y causa). Un documento sin binario conserva su registro y las referencias de las entradas que sembró, pero ya no admite reprocesamiento ni fusión (§7).
 - `job_sources` — configuración por canal (api | email_alert | career_page | manual).
 - `companies` — nombre, dominio, dossier (jsonb), last_researched_at.
 - `job_postings` — esquema canónico: título, company_id, descripción cruda, requisitos estructurados (jsonb, cacheado del parseo LLM), salario min/max, ubicación, tipo remoto, seniority, fuente, URL externa, dedup_hash, embedding (pgvector).
@@ -208,9 +233,9 @@ Este check es parte del pipeline, no opcional. En `generated_assets` se persiste
 | Tipado | mypy `--strict` + Pydantic v2 en todas las fronteras | Requisito del proyecto |
 | ORM/DB | SQLAlchemy 2.0 (typed) + Alembic · Postgres 16 + pgvector | Una sola DB para todo, incluidos embeddings; no meter un vector-store aparte en v1 |
 | Colas | Celery + Redis | El equipo ya lo domina (ALPHA) |
-| LLM | Adapter propio sobre LangChain (structured output) + LangGraph solo simulador; proveedor inicial **Google Gemini** vía `langchain-google-genai` (ADR-003) | Proveedor intercambiable desde el día 1. El adapter cubre también los **embeddings**; cada vector persiste `embedding_model` y `embedding_dim` para permitir migración de proveedor sin pérdida de datos |
+| LLM | **Multi-proveedor detrás del adapter** (`adapters/llm/`), sobre LangChain (structured output) + LangGraph solo en el simulador. **Generación y embeddings se configuran por separado** (ADR-011), cada uno con su proveedor y su API key; pueden ser el mismo o distintos. **Generación:** Gemini (default sugerido por capa gratuita, ADR-003), OpenAI, Anthropic, DeepSeek, Kimi/Moonshot. **Embeddings:** Gemini (default sugerido), OpenAI y los demás que la verificación empírica confirme. Lista **cerrada** en v1 | La API key la pone el usuario, así que el proveedor lo elige él (art. XI). Se separan porque **Anthropic no ofrece embeddings**: amarrarlos dejaría sin matching semántico a quien elija Claude. Las capacidades —salida estructurada nativa, embeddings, dimensión del vector— viven en una **matriz explícita** que declara cada proveedor; ninguna feature consulta el nombre del proveedor, consulta la capacidad, y un `if provider == "..."` fuera del adapter es un bug. Capacidad ausente → degradación **explícita e informada** en el wizard, nunca en silencio. Cada vector persiste `embedding_model` y `embedding_dim`: **cambiar el proveedor de embeddings obliga a re-embeber** y la UI lo advierte antes; cambiar el de generación no persiste nada. `StructuredOutputPort` y `EmbeddingsPort` admiten `base_url` configurable y credencial opcional para que Ollama y compatibles sean una implementación nueva, no un refactor — **no se implementan en v1** |
 | Documentos | python-docx, WeasyPrint o docx→pdf (ya resuelto en ALPHA) | Reuso directo |
-| Email inbound | Parser de correos de alertas | Reuso del know-how de ALPHA |
+| Email | Lectura IMAP de la etiqueta designada por el usuario, detrás de `EmailPort` (ADR-012) | Opcional. Reuso del know-how de parseo de ALPHA. No hay envío transaccional: sin cuentas no hay verificación ni reset |
 | Calidad | ruff (lint+format), pre-commit, pytest + coverage | |
 
 ### Frontend
@@ -224,7 +249,17 @@ Este check es parte del pipeline, no opcional. En `generated_assets` se persiste
 | Testing | Vitest + React Testing Library + Playwright (e2e) | |
 
 ### Infra
-Docker multi-stage · **Docker Compose sobre el VPS Hostinger existente** para dev, staging y prod, separados por proyecto Compose y base de datos distintas (ADR-002); reverse proxy con TLS automático (Caddy o nginx) sirviendo también el frontend estático · **Sin Kubernetes en v1** — sobredimensionado para la escala esperada; se reevalúa contra el umbral documentado en ADR-002 · GitHub Actions (CI/CD, deploy por SSH) · Sentry (errores) · Langfuse o LangSmith (trazas y costos LLM) · Logs estructurados (structlog).
+
+**No hay infraestructura del proyecto: hay una instalación en la máquina de cada persona** (ADR-009).
+
+- **Docker Compose con cuatro servicios y ni uno más:** `api`, `worker` (Celery), `postgres` (16 + pgvector) y `redis`. Imágenes Docker multi-stage. Cada servicio adicional que el usuario deba levantar es un usuario menos, y debe justificarse frente a la alternativa de no tenerlo (art. VII).
+- **Puertos publicados SOLO en `127.0.0.1`** — `"127.0.0.1:8000:8000"`, **nunca** `"8000:8000"`. Sin autenticación, dónde escucha la instancia es el único control de acceso que existe (ADR-008). La forma corta publica en todas las interfaces, y **el firewall del host no lo detiene**: las reglas de Docker en la cadena `DOCKER` de `nat` se evalúan antes que las de `ufw`/`firewalld`. `postgres` y `redis` **no se publican en absoluto**; se alcanzan por la red interna de Compose. Dos tests de integración (`tests/integration/test_local_binding.py`) hacen de esto un requisito verificable y no un criterio de revisión de PR.
+- **Migraciones Alembic automáticas al arranque**, y deben soportar **saltos de varias versiones**: actualizar depende del usuario (`git pull`), así que habrá instalaciones meses atrasadas. Una migración que solo funcione desde la versión inmediata anterior es un bug (ADR-009).
+- **Sin MinIO ni S3.** Los documentos viven en el filesystem local detrás del `StoragePort`, sin cifrado en reposo — no protegería nada cuando la clave estaría en un `.env` junto a los datos que cifra (ADR-007). La protección real se recomienda en el README: cifrado de disco del sistema operativo.
+- **Sin Sentry por defecto.** Errores en **logs locales estructurados** (structlog); el envío a un servicio externo solo bajo **opt-in explícito** y desactivado de fábrica (art. VIII, constitución v2.1.0). Un reporte de error arrastra rutas, fragmentos de datos y a veces contenido de prompt: enviarlo por defecto sería la misma fuga que el art. V prohíbe, entrando por la puerta de la operación.
+- **Trazas de LLM locales y solo con metadatos** (modelo, versión de prompt, tokens, costo, latencia, éxito/error). **Descartadas Langfuse, LangSmith y cualquier plataforma de observabilidad de LLM que capture prompts**, hospedada o auto-alojada: un prompt de Vokara lleva el CV íntegro, es decir PII de principio a fin (ADR-003). Depurar sin ver la entrada que rompió el prompt se resuelve reproduciendo con el golden set, que es material sintético.
+- **Sin Kubernetes, sin reverse proxy con TLS, sin ambientes remotos, sin backups del proyecto.** El backup es que el usuario copie su directorio de datos.
+- **GitHub Actions valida, no despliega** (§9).
 
 ### 5.1 Estructura del monorepo
 
@@ -264,7 +299,7 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
 3. **Frontend:** Vitest/RTL por feature; Playwright para los 3 flujos críticos (onboarding → match → generar materiales; tracker; simulador).
 4. **Evals de LLM (tan importantes como los tests):**
    - Golden set: 30–50 CVs **propios del equipo, de voluntarios con consentimiento específico, o sintéticos** + 50 JDs etiquetadas a mano.
-   - **El golden set NUNCA incluye CVs de usuarios reales del producto** (feature 001, FR-033a). Usar material de usuarios reales para evals, golden set o ajuste de prompts requeriría un **ADR propio** y un **consentimiento opt-in explícito, separado del consentimiento de uso del servicio y revocable** (FR-033b). No se habilita por consentimiento general del servicio ni por un cambio del aviso de privacidad.
+   - **El golden set NUNCA incluye CVs de usuarios reales del producto** (feature 001, FR-033a). Con ejecución local esto deja de ser solo una política y pasa a ser una imposibilidad arquitectónica: el equipo no tiene acceso a los datos de nadie (§7). La regla se conserva escrita porque define qué pasaría si alguien quisiera saltarla: usar material de usuarios reales para evals, golden set o ajuste de prompts exigiría que **ellos lo enviaran deliberadamente** tras un **ADR propio** y un **opt-in explícito y revocable** (FR-033b). Un contribuidor que aporte CVs reales de terceros a la suite de evals está violando esta regla igual que lo estaría el equipo.
    - Métricas: F1 de extracción de campos del CV; precisión@10 del ranking contra etiquetas humanas; tasa de detección del verificador de veracidad (con casos trampa sembrados).
    - **Casos de exageración como fallo:** las evals del verificador incluyen reformulaciones que inflan el hecho original aunque el `source_id` sea válido ("participé en" → "lideré", "apoyé" → "diseñé", métricas infladas). Detectarlas es parte del criterio de aprobación, no un extra (§4.6, constitución art. IV).
    - Corren en CI en cada cambio de prompt/modelo → cambiar un prompt deja de ser un acto de fe.
@@ -274,19 +309,51 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
 
 ## 7. Seguridad y privacidad
 
-- Aviso de privacidad y consentimiento explícito (LFPDPPP); los CVs son datos personales.
-- Cifrado en tránsito (TLS) y en reposo (storage cifrado para documentos).
-- Derecho de eliminación real: borrar cuenta = borrar perfil, documentos, embeddings y materiales generados (job asíncrono verificable).
-- **Ciclo de vida del CV original** (decidido en la feature 001; ver `specs/001-candidate-onboarding/spec.md`):
-  - **Borrado manual por el candidato:** puede eliminar su archivo sin eliminar el perfil que sembró, siempre que exista al menos una versión confirmada del perfil. Antes de confirmar se le advierte que pierde la capacidad de reprocesar y de fusionar contra ese archivo.
-  - **Purga automática por retención:** tras **12 meses de inactividad de la cuenta** —no de tiempo desde la subida—, con aviso previo al candidato; cualquier actividad de la cuenta reinicia el contador. El plazo es **configurable, nunca una constante en código**. El perfil, sus entradas y sus versiones sobreviven a la purga.
-  - **Eliminación de cuenta:** inmediata e irreversible, sin ventana de gracia. Exige confirmación escrita (el correo de la cuenta o una palabra de confirmación), no solo un botón, y antes de confirmar se ofrece exportar el archivo original y el perfil completo en formato consultable.
-  - En los tres casos se elimina el **binario del storage** y el registro en `documents` queda marcado con la causa.
+**El modelo cambió de raíz con el pivote local-first.** Vokara no es responsable de datos de nadie: no hay base central que filtrar ni cuentas que vulnerar. La privacidad deja de ser una promesa operativa y pasa a ser una propiedad de la arquitectura — el dato está donde el usuario lo puso (art. V). Lo que la arquitectura *no* puede garantizar se compensa con divulgación explícita, no con silencio.
+
+### 7.1 La frontera: qué sale de la máquina y qué no
+
+- Los datos del candidato —CV original, perfil maestro, embeddings, materiales generados, historial de aplicaciones— **nunca salen de su máquina**. Existe **una sola excepción**: el contenido que Vokara envía al proveedor de LLM que el propio usuario configuró con su API key.
+- **Divulgación obligatoria de esa excepción**, en texto claro, **en la primera ejecución y en el README** (§11): qué se envía, a qué proveedor y en qué momento del flujo. Concretamente: el CV íntegro al parsear (F1.1), la descripción de la vacante al parsearla (F1.3/F1.5), el perfil maestro y la JD al generar materiales (F2.1–F2.3), y la conversación al usar el simulador (F3.3). **Prohibido enterrar la divulgación** en documentación secundaria o darla por sabida.
+- Se divulga también qué **otros** servicios se contactan cuando el usuario los activa: APIs de agregadores con sus llaves, y su propio Gmail por IMAP si vinculó correo (ADR-012).
+- **Cero telemetría, analítica o reportes de error a terceros por defecto.** Cualquier telemetría futura exige **opt-in explícito Y un ADR propio**; sin ambas cosas, no se implementa. Consecuencia asumida: el proyecto no sabrá cuántas instalaciones hay ni dónde fallan, y los únicos canales de señal son issues y reportes voluntarios (ADR-009).
+- **Verificar y divulgar en el README, por proveedor soportado**, la disponibilidad regional y los términos de uso de datos —en particular, que no se usen para entrenamiento—. Con ejecución local esa elección es del usuario, y solo puede elegir bien si tiene el dato (ADR-003).
+
+### 7.2 Credenciales: API keys y App Passwords
+
+- Se leen de **configuración local** (variables de entorno o archivo de configuración del usuario, fuera del repositorio). `.env` nunca se commitea; `.env.example` sí, con valores dummy.
+- **Prohibido persistirlas en la base de datos. Prohibido que aparezcan en logs, trazas o mensajes de error.** Aplica igual a la API key del LLM, a las llaves de agregadores y a la App Password de Gmail (ADR-012).
+- Un mensaje de error de credencial inválida dice **qué hacer** ("la API key de Gemini fue rechazada; genera una nueva en …"), nunca el valor de la clave.
+- Revocar es la forma de desvincular: se documenta cómo revocar la App Password desde la cuenta de Google y cómo rotar cada API key.
+
+### 7.3 Control de acceso: bind a loopback como requisito, no como recomendación
+
+- **Sin autenticación** (ADR-008): la instancia sirve a una sola persona, la que la instaló, y la frontera de seguridad real es la sesión del sistema operativo.
+- Por eso **el único control de acceso de Vokara es dónde escucha**, y eso lo convierte en un requisito verificable: todo puerto publicado lleva prefijo `127.0.0.1:`, `postgres` y `redis` no se publican, y dos tests de integración fallan si alguien lo rompe (§5 Infra). **Un puerto publicado en `0.0.0.0` es un bug de seguridad, no un detalle de configuración.**
+- Si el puerto sale de la máquina no hay nada detrás: cualquiera en esa red lee el perfil, los CVs y los materiales generados. Se dice así de claro en el README.
+- **No hay PIN ni pantalla de bloqueo local**, deliberadamente: sería un bloqueo de UI sobre datos en claro, y comunicaría una protección que no existe. Una falsa sensación de seguridad cambia el comportamiento del usuario en la dirección equivocada (ADR-008).
+
+### 7.4 Los archivos quedan en claro — riesgo divulgado
+
+- **Riesgo asumido y divulgado (ADR-007):** los CVs y materiales generados se guardan **sin cifrar** en el filesystem del usuario. Cualquier proceso que corra con su cuenta puede leerlos, y un equipo robado sin cifrado de disco expone su contenido.
+- No es una omisión: en local la clave maestra viviría en un `.env` junto a los datos que protege, así que el cifrado de aplicación no añadiría una barrera, añadiría un paso. La respuesta correcta al riesgo real —robo o pérdida del equipo— es el **cifrado de disco del sistema operativo** (FileVault, BitLocker, LUKS), y el README lo recomienda en vez de implementar una versión peor del mismo mecanismo.
+- Queda **diferido, no descartado**, para un eventual despliegue multi-usuario, donde las premisas del cifrado en reposo vuelven a cumplirse.
+
+### 7.5 Ciclo de vida del CV original
+
+Borrar es borrar un archivo en un disco: no hay réplicas, backups ni buckets que perseguir, así que no hace falta un job asíncrono verificable. Lo que sí se conserva de la feature 001 es la disciplina de producto (ver `specs/001-candidate-onboarding/spec.md`):
+
+- **Borrado manual por el candidato:** puede eliminar su archivo sin eliminar el perfil que sembró, siempre que exista al menos una versión confirmada del perfil. Antes de confirmar se le advierte que pierde la capacidad de reprocesar y de fusionar contra ese archivo.
+- **Purga automática por retención:** tras **12 meses de inactividad de la instalación**, con aviso previo; cualquier actividad reinicia el contador. El plazo es **configurable, nunca una constante en código**. El perfil, sus entradas y sus versiones sobreviven a la purga.
+- **Borrar todo:** desinstalar Vokara es borrar el directorio de datos y bajar el Compose. Dentro de la app se ofrece un borrado completo equivalente, inmediato e irreversible, con confirmación escrita y con la opción de exportar antes el archivo original y el perfil completo en formato consultable.
+- En todos los casos se elimina el binario del storage y el registro en `documents` queda marcado con la causa.
 - **Usos autorizados del CV conservado:** respaldo, descarga por el candidato y reprocesamiento **solo a petición explícita**. El sistema puede sugerir reprocesar con un aviso pasivo en la UI del perfil (desactivable), nunca por correo ni notificación, y nunca re-siembra el perfil por iniciativa propia.
-- PII nunca en logs ni en trazas LLM sin redacción.
-- Secretos gestionados en el VPS como variables de entorno fuera del repo (`.env` nunca se commitea; `.env.example` sí, con valores dummy); los valores reales se sincronizan entre máquinas por gestor de contraseñas. Rotación de llaves de APIs de fuentes.
-- **Autenticación con JWT propio** (ADR-001): Argon2id para contraseñas, access token de vida corta, refresh token opaco con **rotación** y detección de reuso (revoca la familia completa), **revocación de `jti` en Redis** con TTL igual al `exp`; refresh en cookie `httpOnly`/`Secure`/`SameSite=Lax` y access token en memoria del frontend.
-- Rate limiting en `/auth/login`, `/auth/register` y `/auth/reset`, con backoff por IP y por cuenta.
+
+### 7.6 Lo que se conserva del modelo anterior
+
+- **PII fuera de logs y de trazas de LLM** (redacción obligatoria). Las trazas registran metadatos, nunca contenido de prompt ni de respuesta (§5 Infra, ADR-003).
+- **Prohibido el scraping de plataformas cuyos ToS lo prohíben** (LinkedIn, Indeed, OCC, Computrabajo) y **prohibido el auto-apply headless**: solo assisted-apply con acción final humana. Estas prohibiciones no se relajan con el pivote — protegen al usuario del baneo de **sus propias** cuentas, y ese riesgo no desaparece al mover el software a su máquina: se traslada a ella.
+- **AGPL-3.0** (ADR-010) como garantía legal, no solo de diseño: quien reciba un Vokara modificado conserva el derecho de auditar el código que procesa sus datos personales, y quien hospede un derivado debe publicar sus cambios (AGPL §13).
 
 ---
 
@@ -295,12 +362,14 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
 > Supuesto: equipo de 2–3 personas (1 backend, 1 frontend/fullstack, producto compartido). Las duraciones son estimaciones honestas, no promesas.
 
 ### Fase 0 — Descubrimiento y especificación (1–2 semanas)
-**Entregables:** documento de specs cerrado (este roadmap refinado), 5 entrevistas con candidatos reales buscando empleo, revisión legal de fuentes de datos y aviso de privacidad, wireframes de los 5 flujos clave, golden set inicial (10 CVs + 20 JDs), ADRs 001–005 (auth, hosting, proveedor LLM, taxonomía de skills, perfil maestro).
+**Entregables:** documento de specs cerrado (este roadmap refinado), 5 entrevistas con candidatos reales buscando empleo, revisión legal de fuentes de datos, wireframes de los 5 flujos clave, golden set inicial (10 CVs + 20 JDs), ADRs base.
+**Nota de v0.4:** el pivote local-first ocurrió al cierre de esta fase. Dos entregables originales quedaron sin objeto —el aviso de privacidad LFPDPPP (no hay responsable de datos) y los ADR-001/002 (auth y hosting, ahora Superseded por ADR-008 y ADR-009)—, y a cambio se produjeron los ADRs 007–010 y 012 y la constitución v2.1.0. La revisión legal de fuentes **sí sigue vigente**: los ToS de las bolsas de trabajo aplican igual cuando el software corre en la máquina del usuario.
 **Criterio de salida:** alcance MoSCoW firmado; nadie discute qué es v1 durante el desarrollo.
 
 ### Fase 1 — Fundaciones (1–2 semanas)
-**Entregables:** monorepo con tooling completo (ruff, mypy strict, pre-commit, CI verde), esqueleto FastAPI + auth + Postgres + Alembic + Celery, front con auth y layout, pipeline de deploy a staging funcionando **desde la semana 1** (deploy continuo desde el inicio, no al final), generación de cliente TS desde OpenAPI integrada al build.
-**Criterio de salida:** un endpoint dummy viaja de DB a UI en staging con tipos end-to-end.
+**Entregables:** monorepo con tooling completo (ruff, mypy strict, pre-commit, CI verde), esqueleto FastAPI + Postgres + Alembic + Celery (sin auth, ADR-008), front con layout, **`docker-compose.yml` con los cuatro servicios y puertos en `127.0.0.1:`** más los dos tests de `test_local_binding.py` en el mismo PR que el Compose, **migraciones automáticas al arranque**, `LICENSE` AGPL-3.0 y README con la divulgación del art. V, generación de cliente TS desde OpenAPI integrada al build.
+**No hay deploy a staging:** no hay staging. El equivalente a "deploy continuo desde la semana 1" en este modelo es que **el repositorio se levante desde cero en una máquina limpia desde la semana 1**, y que siga haciéndolo en cada PR.
+**Criterio de salida:** `docker compose up` levanta todo y un endpoint dummy viaja de DB a UI con tipos generados end-to-end.
 
 ### Fase 2 — MVP núcleo: del CV al match (5–6 semanas)
 **Entregables:**
@@ -319,37 +388,129 @@ Regla de dependencias: `api → services → repositories/adapters`. La lógica 
 **Entregables:** F2.5 follow-ups, F2.6 mensajes a reclutadores, F2.7 analítica del embudo, F4.1 thank-you notes, F4.2 negociación básica, F4.3 comparador de ofertas, F1.6 digest de alertas, canal career pages (F1.3.3).
 **Criterio de salida:** el ciclo de vida completo de una búsqueda vive dentro de Vokara.
 
-### Fase 5 — Hardening y beta cerrada (2–3 semanas)
-**Entregables:** beta con 15–25 candidatos reales, instrumentación de métricas North Star, pruebas de carga sobre ingesta y matching, auditoría de seguridad (OWASP top 10) y privacidad (flujo de eliminación verificado), presupuesto de costo LLM por usuario medido con datos reales, corrección de lo que la beta rompa (lo hará).
-**Criterio de salida:** ≥ 60% de matches marcados relevantes en beta; costo LLM/usuario dentro del presupuesto; 0 hallazgos críticos de seguridad.
+### Fase 5 — Hardening y pruebas con usuarios reales que corren el software localmente (2–3 semanas)
+
+No hay beta cerrada hospedada porque no hay nada que hospedar. En su lugar: **15–25 candidatos reales instalan Vokara en su propia máquina** y lo usan con sus datos y su API key.
+
+**Entregables:**
+- **Prueba de instalación asistida** en Windows (WSL2), macOS y Linux, con al menos un participante no técnico por sistema operativo. **Lo primero que se mide es cuántos logran levantarlo sin ayuda y dónde se atoran los que no** (§11): es la métrica que decide si el modelo de distribución del ADR-009 funciona.
+- Corrección de la fricción encontrada, sobre el flujo de §11 (wizard, diagnóstico, mensajes de error).
+- Recolección de métricas North Star **por reporte voluntario del participante**, no por telemetría (art. V): el instrumento es una entrevista o un formulario que el usuario llena, y hay que diseñarlo como tal.
+- **Costo real de LLM medido por el propio usuario** con las trazas locales, para validar la estimación que §11 le muestra antes de configurar el proveedor.
+- Verificación de que la **degradación explícita** funciona: participantes con proveedores distintos a Gemini, y participantes sin correo vinculado, deben tener un producto usable y saber qué les falta y por qué (art. XI).
+- Auditoría de seguridad y privacidad enfocada en lo que aplica a este modelo: **binding a loopback verificado en máquinas reales**, ausencia de credenciales en logs y trazas, PII fuera de trazas, y el borrado completo del §7.5.
+- Corrección de lo que la prueba rompa (lo hará).
+
+**Criterio de salida:** ≥ 60% de matches marcados relevantes; **≥ 80% de participantes levantan Vokara sin intervención del equipo**; costo LLM medido y coherente con lo estimado; 0 hallazgos críticos de seguridad.
 
 ### Fase 6 — Lanzamiento v1 e iteración continua
-Lanzamiento público, ciclo quincenal de release, y el backlog v1.x priorizado por datos de la beta: extensión de navegador (F2.8), simulador por voz (F3.5), feedback loop de matching (F1.7).
+Release pública en GitHub, ciclo quincenal de release, y el backlog v1.x priorizado por lo que arroje la Fase 5: extensión de navegador (F2.8), simulador por voz (F3.5), feedback loop de matching (F1.7). Si la fricción de instalación resulta ser el cuello de botella real de adopción, el instalador de escritorio vuelve a la mesa con un ADR nuevo y con datos en vez de suposiciones (ADR-009).
 
 **Total estimado a v1 pública: 14–20 semanas.**
 
 ---
 
-## 9. Despliegue y operación
+## 9. Distribución y operación
 
-- **Ambientes:** dev (Compose local) → staging (auto-deploy en merge a `main`) → prod (deploy por tag, con aprobación).
-- **CI (GitHub Actions):** lint + mypy + tests + evals LLM + build de imágenes en cada PR (todo bloqueante); migraciones Alembic aplicadas automáticamente en deploy con verificación de reversibilidad.
-- **Observabilidad:** Sentry (errores back y front), Langfuse/LangSmith (cada llamada LLM con costo, latencia y trazas — indispensable para operar un producto LLM sin volar a ciegas), dashboards de métricas de producto desde la Fase 5.
-- **Backups:** Postgres diario con restauración probada (no solo configurada — probada) antes del lanzamiento.
-- **Runbook mínimo:** qué hacer cuando una fuente de vacantes cambia formato (alerta de VCR-drift), cuando el proveedor LLM cae (fallback de proveedor vía adapter), y cuando el costo LLM se dispara (kill-switch de features caras por config).
+**El equipo no opera nada.** No hay ambientes, ni servidores, ni deploy: lo que se entrega es un repositorio que otra persona ejecuta (ADR-009). Lo que antes era despliegue, ahora es distribución.
+
+- **Distribución vía GitHub.** El repositorio público es el único canal de entrega: `git clone` + `docker compose up`. No hay artefacto que publicar en otro sitio ni infraestructura que aprovisionar.
+- **Versionado por releases.** Cada versión es un tag semántico con release notes en GitHub, y esas notas son la única forma en que el usuario se entera de qué cambió: **no hay canal de actualización automática ni telemetría** para avisarle. Actualizar es cosa suya (`git pull` + migraciones), así que las notas deben decir explícitamente cuándo un cambio requiere acción manual.
+- **Migraciones que soportan saltos de varias versiones.** Habrá instalaciones meses atrasadas. Una migración que solo funcione desde la versión inmediata anterior es un bug, y probar el salto largo es parte de la release, no del deploy (ADR-009).
+- **CI (GitHub Actions) valida el proyecto, no despliega nada.** Se conserva íntegro como **bloqueante en cada PR**: ruff (lint + format), `mypy --strict`, tests unit e integración, evals de LLM cuando aplique, build de imágenes, verificación de reversibilidad de las migraciones Alembic, y los tests de `test_local_binding.py` que impiden publicar un puerto fuera de loopback. Se añade una **prueba de instalación limpia** —levantar el Compose desde cero y verificar que la app responde—, porque en este modelo esa es la funcionalidad más crítica del producto (§11).
+- **Verificación de licencias de dependencias en CI.** Con AGPL-3.0 (ADR-010), una dependencia con licencia incompatible es un bloqueo de merge, no un detalle.
+- **Observabilidad local, para el usuario.** Logs estructurados (structlog) y trazas de LLM **con metadatos únicamente** —costo, latencia, tokens, versión de prompt—, visibles en su máquina y útiles para depurar con él. Sin Sentry ni plataformas de trazas de LLM por defecto (§5 Infra, art. VIII, ADR-003). El corolario incómodo: **el proyecto no verá los errores de nadie**; los issues de GitHub son el canal, y por eso los mensajes de error tienen que ser buenos por sí solos (§11).
+- **Backups: del usuario, no del proyecto.** El README explica qué copiar —el directorio de datos y un dump de Postgres— y cómo restaurarlo. El proyecto no custodia datos de nadie, así que tampoco puede recuperarlos.
+- **Runbook mínimo, reescrito como material para el usuario y para quien atienda issues:** qué hacer cuando una fuente de vacantes cambia formato (alerta de VCR-drift en CI, fix en una release), cuando el proveedor de LLM cae o rechaza la clave (mensaje accionable + cambio de proveedor por configuración, art. XI), cuando la instalación no levanta (pantalla de diagnóstico, §11), y cuando el costo de LLM se dispara (kill-switch de features caras por configuración — aquí el que paga es el usuario, así que el control es suyo).
 
 ---
 
 ## 10. Primeros 10 pasos concretos (próximas 2 semanas)
 
 1. ~~Registrar dominio y repos de Vokara (verificar disponibilidad de vokara.com / vokara.ai / vokara.mx y del nombre en redes).~~ ✅
-2. ~~Escribir ADR-001 a 005 (auth, hosting, proveedor LLM, taxonomía de skills, perfil maestro).~~ ✅
-3. Entrevistar 5 personas buscando empleo hoy — validar que el flujo del MVP (Fase 2) es lo que necesitan.
-4. Solicitar llaves de Adzuna/Jooble/JSearch y evaluar cobertura real de vacantes en México con 20 búsquedas de prueba.
-5. Configurar el buzón inbound y validar el parseo de un correo de alerta real de LinkedIn y uno de OCC.
+2. ~~Escribir los ADRs base (001–012) y pivotar la constitución a v2.1.0.~~ ✅ · **Pendiente: llenar la tabla "Estado de verificación" del ADR-011** — probar empíricamente salida estructurada, respeto de `null` en opcionales, embeddings y dimensión en Gemini, OpenAI, Anthropic, DeepSeek y Kimi. Un proveedor sin verificar no se ofrece en el wizard (§11.2).
+3. Entrevistar 5 personas buscando empleo hoy — validar que el flujo del MVP (Fase 2) es lo que necesitan **y observar a dos de ellas intentando instalarlo**: la fricción de instalación se valida con personas, no con suposiciones (§11).
+4. Solicitar llaves de Adzuna/Jooble/JSearch y evaluar cobertura real de vacantes en México con 20 búsquedas de prueba. **Documentar además cuántos pasos le cuesta a un usuario obtener las suyas**: en local, cada llave la tramita él.
+5. Validar el camino de correo del ADR-012 de punta a punta: crear el filtro y la etiqueta en una cuenta Gmail real, generar una App Password, leer por IMAP **solo esa etiqueta**, y parsear un correo de alerta real de LinkedIn y uno de OCC.
 6. Armar el golden set inicial (10 CVs propios, de voluntarios con consentimiento específico, o sintéticos + 20 JDs etiquetadas). Nunca CVs de usuarios del producto (§6.4).
 7a. ~~Inicializar el repositorio (Spec Kit, constitución, ADRs, roadmap).~~ ✅
-7b. Levantar el monorepo con el tooling de la Fase 1 (`backend/`, `frontend/`, `infra/`, ruff, mypy strict, pre-commit, CI verde, deploy a staging).
-8. Wireframes de: onboarding, lista de matches, detalle de vacante con score, kanban, workspace de preparación.
-9. Redactar aviso de privacidad y flujo de consentimiento.
-10. Definir el presupuesto de costo LLM objetivo por usuario activo/mes.
+7b. Levantar el monorepo con el tooling de la Fase 1 (`backend/`, `frontend/`, `infra/`, ruff, mypy strict, pre-commit, CI verde) **más el `docker-compose.yml` con puertos en `127.0.0.1:` y sus dos tests de binding en el mismo PR**. Sin deploy: el criterio es que levante desde cero en una máquina limpia.
+8. Wireframes de: **wizard de primera ejecución y pantalla de diagnóstico (§11)**, onboarding, lista de matches, detalle de vacante con score, kanban, workspace de preparación.
+9. Añadir `LICENSE` (AGPL-3.0, ADR-010) y redactar el README: instalación probada en Windows (WSL2), macOS y Linux; **divulgación del art. V** (qué se envía al proveedor de LLM y cuándo); recomendación de cifrado de disco (ADR-007); nota de que Vokara solo escucha en la máquina del usuario (ADR-008); limitación de App Passwords en cuentas Workspace (ADR-012). **Ya no hay aviso de privacidad LFPDPPP: no somos responsables de datos de nadie.**
+10. Calcular el **costo estimado de LLM por mes de búsqueda activa** para cada proveedor soportado, y decidir cómo se le muestra al usuario **antes** de pedirle su API key (§11). El presupuesto ya no es del proyecto: es información que el usuario necesita para decidir.
+
+---
+
+## 11. Experiencia de instalación y primera ejecución
+
+**Esto es un entregable de primer nivel, no documentación de soporte.** El artículo VII eleva la fricción de instalación a criterio constitucional por una razón concreta: en el modelo local-first, quien no logra levantar Vokara simplemente no lo usa, y el público objetivo no es exclusivamente técnico. Cada obstáculo entre `git clone` y el primer match es equivalente a una feature que no existe. Se diseña, se prueba con personas y se corrige como cualquier otra parte del producto (Fase 5).
+
+El estándar de calidad de toda esta sección cabe en una frase: **una persona que sabe usar una computadora pero no programa debe llegar sola desde el repositorio hasta su primer match.**
+
+### 11.1 Instalación de un comando
+
+- **Un solo comando después de clonar.** `docker compose up` —o un script `./install.sh` equivalente que lo envuelva— debe funcionar **sin edición manual de archivos** más allá de lo que el wizard pide después. Nada de "copia el `.env.example`, edita estas ocho variables y luego corre las migraciones": eso es el fallo que esta sección existe para evitar.
+- **Migraciones automáticas al arranque** (§5). El usuario nunca ejecuta un comando de Alembic, ni en la primera instalación ni al actualizar.
+- **Guía probada, no escrita de memoria**, en Windows (WSL2), macOS y Linux (ADR-009). "Probada" significa ejecutada por alguien en una máquina limpia, y esa prueba corre también en CI (§9).
+- **Prerrequisitos explícitos y verificados por el propio instalador**: Docker, versión mínima, y en Windows WSL2. Si falta algo, el mensaje dice qué instalar y enlaza a dónde.
+- El objetivo declarado es que la instalación entera se mida en minutos, no en tarde.
+
+### 11.2 Wizard de primera ejecución: dos pasos obligatorios y uno opcional
+
+Al abrir Vokara por primera vez, el usuario entra en un wizard. **No hay registro ni login que atravesar** (ADR-008): lo primero que ve es esto.
+
+**Paso 1 — Divulgación (obligatorio).** Antes de configurar nada, en texto claro y en la pantalla —no en un enlace, no en el README (art. V)—: qué datos se quedan en su máquina, cuál es la **única** excepción (el contenido enviado al proveedor de LLM que él elija), **qué se envía exactamente y en qué momento** (el CV al parsearlo, la JD al parsearla, perfil + JD al generar materiales, la conversación en el simulador), que Vokara **no envía telemetría ni reportes de error a terceros**, y que **sus archivos quedan en claro en el disco** con la recomendación de activar el cifrado de disco del sistema operativo (ADR-007). Se avanza con un acuse explícito.
+
+**Paso 2 — Proveedores de LLM y API keys, con preflight de capacidades (obligatorio).**
+
+Se configuran **dos proveedores, no uno** (ADR-011): uno para **generación** (salida estructurada) y otro para **embeddings**, cada uno con su propia API key. Pueden ser el mismo o distintos, y la pantalla dice por qué están separados en una línea: no todos los proveedores ofrecen embeddings —**Anthropic no lo hace**—, y amarrarlos dejaría el matching semántico inoperante según a quién eligiera el usuario.
+
+- **Default sugerido: Gemini para ambos**, preseleccionado, con la razón en la propia pantalla —es el único con capa gratuita suficiente para usar Vokara de verdad sin tarjeta (ADR-003)— y **una sola llave** que resuelve el caso común en una elección. Los demás aparecen como iguales, no como opciones de segunda.
+- **Generación:** Gemini, OpenAI, Anthropic, DeepSeek, Kimi/Moonshot. **Embeddings:** Gemini, OpenAI y los demás que la verificación empírica del ADR-011 confirme. Un proveedor sin verificar **no se ofrece en la lista**.
+- Enlace directo a dónde se obtiene la llave de cada proveedor, con los pasos contados.
+- **Preflight al guardar cada clave, no en el primer uso real.** Vokara hace una llamada de prueba y verifica la **capacidad** que ese proveedor debe cubrir —salida estructurada para el de generación, embeddings y su dimensión para el de embeddings (art. XI, ADR-011)— antes de dejar avanzar. Los tres resultados posibles son distintos y se comunican distinto: llave válida y con la capacidad → adelante; llave válida pero **sin la capacidad** (p. ej. salida estructurada no garantizada) → se dice **qué funciones concretas no estarán disponibles y por qué**, y el usuario decide si continúa así o cambia de proveedor (degradación explícita e informada, nunca silenciosa); llave rechazada → mensaje accionable, nunca un stack trace.
+- Las claves se guardan en **configuración local**, nunca en la base de datos, y nunca aparecen en logs ni en mensajes de error (art. V, §7.2).
+- **Cambiar después el proveedor de embeddings desde Ajustes invalida los vectores ya persistidos** —cambia la dimensión—: la UI lo advierte **antes** de permitir el cambio y ofrece el reprocesamiento. Cambiar el de generación no tiene ese efecto y no se advierte igual, porque no persiste nada.
+
+**Paso 3 — Vincular correo (opcional, y visiblemente opcional).**
+- Se puede **omitir con un clic** y llegar igual al producto completo. La pantalla dice qué se gana vinculando (una fuente de vacantes más rica: LinkedIn, OCC, Computrabajo vía sus correos de alerta) y qué **no** se pierde al omitirlo (todo lo demás: agregadores, URL manual, matching, materiales, preparación).
+- Si el usuario acepta: los tres pasos del ADR-012 —verificación en dos pasos, App Password, etiqueta de Gmail— guiados con capturas, más la **divulgación obligatoria** de que una App Password da acceso a **toda** la bandeja y que leer solo la etiqueta designada es un compromiso de Vokara verificado por tests, no un límite que Google imponga.
+- **Aviso por adelantado** de que las cuentas de Google Workspace y las de Protección Avanzada no admiten App Passwords, con el enlace a la vía OAuth. Se dice **antes** de empezar, no a mitad de la configuración.
+
+### 11.3 Transparencia de costo
+
+- **Antes** de pedir cada API key, el wizard muestra el **costo estimado por mes de búsqueda activa** del proveedor seleccionado, con el supuesto de uso a la vista ("~X vacantes analizadas y ~Y materiales generados al mes") para que la cifra sea interpretable y no un número mágico.
+- **Generación y embeddings se estiman por separado** (ADR-011), porque sus órdenes de magnitud no se parecen: los embeddings son sustancialmente más baratos. Mostrarlos sumados haría creer que cambiar de proveedor de embeddings mueve la factura, cuando lo que la mueve es la generación.
+- Para Gemini se indica explícitamente **qué cabe dentro de la capa gratuita** y a partir de qué punto se empieza a pagar.
+- Después, el **costo real acumulado** es consultable en la app desde las trazas locales (§5 Infra). El usuario tiene que poder responder "¿cuánto llevo gastado?" sin salir de Vokara.
+- **Kill-switch por configuración** para las funciones caras (generación de materiales, simulador), porque aquí quien paga la inferencia es él y el control debe ser suyo (§9).
+
+### 11.4 Pantalla de diagnóstico del sistema
+
+Una pantalla permanente en la app —no solo del wizard— que responde "¿está todo bien?" sin pedirle al usuario que lea logs ni abra una terminal. Verifica y muestra el estado de:
+
+- Los cuatro servicios del Compose (`api`, `worker`, `postgres`, `redis`) y su conectividad.
+- Versión de esquema y **migraciones pendientes** tras un `git pull`.
+- **Los dos proveedores configurados** —generación y embeddings (ADR-011)—, el resultado del **preflight de capacidades** de cada uno y **qué funciones están degradadas** por ello. Para embeddings, además, el `embedding_model` con el que están hechos los vectores actuales y si coincide con el proveedor configurado: si no coincide, hay reprocesamiento pendiente.
+- Correo vinculado o no, y si la etiqueta configurada existe y es alcanzable.
+- Llaves de agregadores presentes y válidas.
+- Directorio de datos: ruta, espacio disponible y **documentos con `storage_key` cuyo archivo ya no existe** (ADR-007).
+- **Que los puertos estén publicados solo en loopback** — si algo quedó expuesto, es una advertencia de seguridad visible, no una línea en un log (§7.3).
+- **Nunca muestra credenciales**, ni siquiera parcialmente: solo "configurada / no configurada / rechazada".
+
+Es también la primera cosa que se le pide a alguien que abre un issue: sin telemetría, esta pantalla es el reporte de estado del proyecto (§9).
+
+### 11.5 Mensajes de error que dicen qué hacer
+
+Regla, no aspiración: **todo error que el usuario pueda ver le dice qué pasó, por qué y cuál es el siguiente paso concreto.** Un stack trace en la UI es un bug de producto.
+
+| En vez de | Decir |
+|---|---|
+| `Connection refused: postgres:5432` | "La base de datos no está lista. Suele tardar unos segundos en el primer arranque; si persiste, revisa la pantalla de diagnóstico." |
+| `401 Unauthorized` | "Tu proveedor rechazó la API key. Verifica que la copiaste completa y que sigue activa en [enlace a la consola del proveedor]." |
+| `429 Too Many Requests` | "Alcanzaste el límite de tu capa gratuita de Gemini. Puedes esperar al reinicio de cuota o configurar otro proveedor en Ajustes." |
+| `imaplib.error: AUTHENTICATIONFAILED` | "Gmail rechazó la App Password. Si tu cuenta es de Google Workspace, las App Passwords están deshabilitadas: usa la vía OAuth [enlace]." |
+| `NotImplementedError: embeddings` | "El proveedor de embeddings que configuraste no ofrece esa capacidad, así que el matching semántico está desactivado. El matching por reglas sigue funcionando, y tu proveedor de generación no se ve afectado. Para activarlo, elige otro proveedor de embeddings en Ajustes." |
+| `FileNotFoundError: /data/...` | "No se encuentra el archivo de tu CV en el directorio de datos. Si moviste o borraste esa carpeta, tu perfil sigue intacto, pero no se puede reprocesar el archivo original." |
+
+Ningún mensaje incluye una API key, una App Password ni PII (§7.2). Los tres errores más probables de la primera ejecución —Docker ausente, puerto ocupado, API key inválida— se prueban a mano en cada release: son los que deciden si alguien se queda o se va.
