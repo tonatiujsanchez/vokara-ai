@@ -75,8 +75,18 @@ Se adopta el concepto de **perfil maestro** (`candidate_profile`) como fuente
 - La UI de revisión y enriquecimiento del perfil es más trabajo que un formulario
   plano; es el gate de calidad de todo el producto y debe justificar su fricción.
 - **Fusión al re-subir un CV maestro:** si el usuario ya editó o agregó entradas
-  a mano, un nuevo CV no debe pisarlas. Requiere estrategia explícita de merge
-  (resolver en `/speckit.clarify` de la feature 001).
+  a mano, un nuevo CV no debe pisarlas. Estrategia resuelta en la feature 007
+  (`specs/007-master-profile-merge/spec.md`): **refresco automático acotado**
+  solo a entradas que siguen siendo `cv_seed` puras —nunca tocadas por el
+  usuario—, conservando su identificador; los conflictos contra entradas
+  `user_edited` o `user_added` NUNCA se resuelven automáticamente, se presentan
+  al candidato para que decida entrada por entrada (art. X); y aplicar la
+  fusión genera una versión nueva de origen `cv_merge`, consultable y
+  revertible al contenido exacto previo, que NO es la versión vigente hasta que
+  exista una confirmación explícita (versión de origen `confirmation`). Ver
+  007/FR-004 y 007/FR-006. El riesgo residual se traslada al **criterio de
+  equivalencia entre entradas**, que la spec exige determinista y testeable por
+  tipo de entrada (007/FR-005).
 - La reformulación sigue siendo un punto de riesgo: reformular con `source_id`
   válido no garantiza fidelidad al hecho original. Las evals deben incluir casos
   de exageración (p. ej. "participé en" → "lideré").
@@ -88,5 +98,17 @@ Se adopta el concepto de **perfil maestro** (`candidate_profile`) como fuente
 - **Roadmap:** F1.1 cambia de "CV → perfil" a "CV maestro → sembrar perfil →
   revisar/enriquecer → confirmar". F2.1 se reformula como selección desde el
   perfil maestro. Sección 4.3 (modelo de datos) incorpora `profile_entries`.
-- **Feature 001:** la spec debe reflejar el flujo de siembra + enriquecimiento y
-  el caso borde de fusión al re-subir.
+- **Features derivadas de este ADR** (split del 2026-08-10; las decisiones son
+  las mismas, solo cambia dónde viven):
+  - **001 — Onboarding del candidato**
+    (`specs/001-candidate-onboarding/spec.md`): camino feliz — siembra desde el
+    CV maestro, enriquecimiento, cuestionario de objetivos y gate de
+    confirmación explícita con versionado.
+  - **006 — Ciclo de vida de los datos de la cuenta**
+    (`specs/006-account-data-lifecycle/spec.md`): usos autorizados del archivo
+    conservado, borrado manual, purga por inactividad y eliminación de cuenta.
+    Concreta que el archivo original es respaldo con vida acotada, no fuente de
+    verdad.
+  - **007 — Fusión del perfil maestro al re-subir el CV**
+    (`specs/007-master-profile-merge/spec.md`): resuelve el pendiente que este
+    ADR había diferido (007/FR-004, 007/FR-005, 007/FR-006).
