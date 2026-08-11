@@ -94,7 +94,7 @@ select = [
 
 [tool.ruff.lint.isort]
 # `app` is installed into the environment as a package; say it is ours.
-known-first-party = ["app"]
+known-first-party = ["app", "tests"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
