@@ -124,7 +124,7 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 - [X] T031 `backend/app/openapi_export.py` — vuelca `openapi.json` sin levantar servidor (`python -m app.openapi_export`), con test que verifica que el volcado es determinista (research R-16)
 - [X] T032 Script `generate:api` en `frontend/package.json` (openapi-typescript) y generación **commiteada** de `frontend/openapi.json` y `frontend/src/api/schema.d.ts`
 - [X] T033 `frontend/src/api/client.ts` con openapi-fetch tipado contra `schema.d.ts`, `frontend/src/routes/` con react-router v6, y una pantalla de estado que consume `GET /health` **con los tipos generados**, no escritos a mano (art. I)
-- [ ] T034 [P] Test de front en `frontend/tests/health.test.tsx` (Vitest + RTL + MSW contra el esquema generado)
+- [X] T034 [P] Test de front en `frontend/tests/health.test.tsx` (Vitest + RTL + MSW contra el esquema generado)
 
 ### CI bloqueante
 
