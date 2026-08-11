@@ -20,7 +20,16 @@ Guía para levantar el entorno y **verificar** que la feature cumple lo que la s
 
 **No hay `.env` que rellenar para arrancar.** Ni `JWT_SECRET` (no hay auth, ADR-008), ni `DOCUMENT_ENCRYPTION_KEY` (no hay cifrado, ADR-007), ni credenciales de S3 (no hay object storage). Las API keys las pide el wizard y se escriben en configuración local (FR-008). Las variables opcionales —`VOKARA_DATA_DIR`, overrides de nombre de modelo— tienen defaults sensatos y solo se tocan para desviarse de ellos.
 
-Al añadir una variable nueva, actualizar `infra/.env.example` **en el mismo commit**: es la única forma de que la otra máquina se entere (ADR-000).
+### El `.env` vive en la raíz del repositorio, y en ningún otro sitio
+
+**Decisión vinculante.** Hay **un solo** `.env`, en la raíz del repo, junto a `.env.example`. Es donde ya lo busca `scripts/verify_providers.py` y donde el usuario espera encontrarlo. **No existe `infra/.env` ni `infra/.env.example`.** Dos ubicaciones para la misma llave son fricción del art. VII y la causa más previsible del issue "a mí no me toma la API key".
+
+Como el comando documentado es `docker compose -f infra/docker-compose.yml up`, Compose toma `infra/` como directorio de proyecto y **buscaría ahí su `.env`**. Se resuelve con dos reglas, ambas verificadas por `backend/tests/integration/test_compose_env_contract.py`:
+
+1. `api` y `worker` declaran `env_file: [{ path: ../.env, required: false }]` — ruta relativa al archivo de Compose, es decir la raíz del repo. `required: false` hace que un clon virgen **sin `.env`** arranque igual.
+2. **`infra/docker-compose.yml` no usa interpolación `${...}`.** Es la única construcción que leería el `.env` del directorio de proyecto y que reintroduciría en silencio la segunda ubicación. Los valores de infraestructura (usuario, contraseña y nombre de la base, URLs internas) son literales en el Compose: son credenciales de desarrollo local de una base que **no se publica al host**, así que no hay nada que parametrizar.
+
+Al añadir una variable nueva, actualizar el `.env.example` **de la raíz** en el mismo commit: es la única forma de que la otra máquina se entere (ADR-000).
 
 ---
 
@@ -31,7 +40,7 @@ git clone <repo> && cd vokara
 docker compose -f infra/docker-compose.yml up
 ```
 
-Eso es todo. Las migraciones se aplican **solas** al arranque (roadmap §11.1): el usuario nunca ejecuta un comando de Alembic.
+Eso es todo. Las migraciones se aplican **solas** al arranque (roadmap §11.1): el usuario nunca ejecuta un comando de Alembic. **Sin copiar ni editar ningún `.env`**: si más tarde creas uno, va en la raíz del repo (§0) y el Compose lo toma vía `env_file: ../.env`.
 
 **Verificación de que el entorno está sano:**
 
@@ -252,7 +261,7 @@ uv run alembic upgrade head && uv run alembic downgrade base && uv run alembic u
 - [ ] `ruff`, `mypy --strict`, tests, evals y build del front en verde localmente
 - [ ] Cliente TS regenerado y commiteado
 - [ ] Migración Alembic con `downgrade` **probado**, no solo escrito
-- [ ] `infra/.env.example` actualizado si se añadió alguna variable
+- [ ] `.env.example` **de la raíz** actualizado si se añadió alguna variable; sigue sin existir `infra/.env`
 - [ ] **Todo puerto nuevo publicado en el Compose lleva prefijo `127.0.0.1:`** y entra en el alcance de `test_local_binding.py` (ADR-008)
 - [ ] Ningún mensaje de error nuevo fuera de [contracts/errors.md](./contracts/errors.md), y todos dicen qué pasó, por qué y el siguiente paso
 - [ ] Ningún log, traza ni mensaje con contenido del documento (FR-045) ni con credenciales (FR-008, FR-013)

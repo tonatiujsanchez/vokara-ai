@@ -281,13 +281,13 @@ infra/
 │   ├── backend.Dockerfile           # multi-stage (builder uv → runtime slim); entrypoint aplica migraciones
 │   └── frontend.Dockerfile          # multi-stage (build Vite → estáticos)
 ├── docker-compose.yml               # api, worker, postgres(16+pgvector), redis — puertos SOLO 127.0.0.1
-├── docker-compose.override.yml      # hot reload en dev, misma regla de binding
-└── .env.example
+└── docker-compose.override.yml      # hot reload en dev, misma regla de binding
 
+.env.example                         # ÚNICA plantilla de configuración, en la raíz (quickstart §0)
 .github/workflows/ci.yml             # ruff · mypy --strict · pytest · binding · evals · drift TS · build · instalación limpia
 ```
 
-**Structure Decision**: monorepo de tres raíces exactamente como lo fija el roadmap §5.1 (`backend/`, `frontend/`, `infra/`), sin desviaciones. Dentro de `backend/app/` la regla `api → services → repositories/adapters` se hace verificable con tests en `backend/tests/architecture/`, para que los arts. II y XI no dependan de la disciplina de quien revisa el PR. `adapters/text_extraction/` existe como puerto —aunque pypdf y python-docx sean librerías locales, no servicios— porque FR-021 deja el OCR explícitamente reevaluable en v1.x: con puerto es un intercambio, sin puerto es una reescritura. El `docker-compose.yml` vive en la raíz de `infra/` y no en `infra/compose/` para que el comando de instalación sea lo más corto posible (roadmap §11.1).
+**Structure Decision**: monorepo de tres raíces exactamente como lo fija el roadmap §5.1 (`backend/`, `frontend/`, `infra/`), sin desviaciones. Dentro de `backend/app/` la regla `api → services → repositories/adapters` se hace verificable con tests en `backend/tests/architecture/`, para que los arts. II y XI no dependan de la disciplina de quien revisa el PR. `adapters/text_extraction/` existe como puerto —aunque pypdf y python-docx sean librerías locales, no servicios— porque FR-021 deja el OCR explícitamente reevaluable en v1.x: con puerto es un intercambio, sin puerto es una reescritura. El `docker-compose.yml` vive en la raíz de `infra/` y no en `infra/compose/` para que el comando de instalación sea lo más corto posible (roadmap §11.1). El `.env` y su `.env.example` viven en la **raíz del repositorio** y no en `infra/`: es donde ya los busca `scripts/verify_providers.py` y dos ubicaciones para la misma llave serían fricción del art. VII. El Compose los alcanza con `env_file: ../.env` y renuncia a la interpolación `${...}`, que es lo único que leería un `.env` distinto (quickstart §0).
 
 ---
 
