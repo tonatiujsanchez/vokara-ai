@@ -19,7 +19,6 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 
 from app.core.config import get_settings
@@ -61,10 +60,6 @@ def _host_ip_of(entry: Any) -> str | None:  # noqa: ANN401 — a YAML node is ar
     return parts[0] if len(parts) >= 3 else None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="verde en T015: infra/docker-compose.yml todavía no existe",
-)
 def test_compose_publishes_only_on_loopback() -> None:
     """Every published port pins an explicit loopback host IP.
 

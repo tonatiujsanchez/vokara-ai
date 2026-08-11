@@ -108,5 +108,7 @@ warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 
 [[tool.mypy.overrides]]
-module = ["testcontainers.*"]
+# Neither ships a py.typed marker. Our own code stays strictly typed; what is
+# relaxed is what mypy knows about theirs.
+module = ["testcontainers.*", "celery.*"]
 ignore_missing_imports = true

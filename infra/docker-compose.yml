@@ -1,0 +1,116 @@
+# Vokara corre en tu máquina. Cuatro servicios y ni uno más (art. VII).
+#
+#     docker compose -f infra/docker-compose.yml up
+#
+# Dos reglas que este archivo cumple y que hay tests que lo verifican:
+#
+# 1. Todo puerto publicado lleva IP de host loopback explícita (ADR-008). Sin
+#    autenticación, dónde escucha la instancia es el único control de acceso que
+#    existe, y `ufw` no protege un puerto publicado por Docker.
+#    postgres y redis no se publican en absoluto.
+#
+# 2. Cero interpolación de variables. Es la única construcción que leería un
+#    .env del directorio de este archivo, y eso reintroduciría en silencio una
+#    segunda ubicación para la misma llave (quickstart §0). El .env vive
+#    únicamente en la raíz del repo y se alcanza con env_file: ../.env.
+#    El test que lo verifica es literal a propósito: busca la secuencia de
+#    interpolación en cualquier línea, comentarios incluidos.
+#
+# Usuario, contraseña y nombre de la base son literales: son credenciales de
+# desarrollo local de una base que no se publica al host, así que no hay nada
+# que parametrizar.
+
+name: vokara
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/backend.Dockerfile
+    environment:
+      # Dentro del contenedor uvicorn DEBE escuchar en 0.0.0.0 o el proxy de
+      # Docker no lo alcanza. Aquí la protección es el mapeo de puertos de
+      # abajo, no el bind (research R-20).
+      VOKARA_API_HOST: "0.0.0.0"
+      DATABASE_URL: "postgresql+psycopg://vokara:vokara_local_dev@postgres:5432/vokara"
+      REDIS_URL: "redis://redis:6379/0"
+      VOKARA_DATA_DIR: "/data"
+    env_file:
+      # Ruta relativa a este archivo, es decir la raíz del repositorio.
+      # required: false hace que un clon virgen sin .env arranque igual.
+      - path: ../.env
+        required: false
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - vokara_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/api/v1/health")
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/docker/backend.Dockerfile
+    # Sin beat: nada en 001 se agenda, y un proceso más sin tarea periódica es
+    # infraestructura sin consumidor (research R-28).
+    command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
+    environment:
+      DATABASE_URL: "postgresql+psycopg://vokara:vokara_local_dev@postgres:5432/vokara"
+      REDIS_URL: "redis://redis:6379/0"
+      VOKARA_DATA_DIR: "/data"
+    env_file:
+      - path: ../.env
+        required: false
+    volumes:
+      - vokara_data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    # Tag fijo: la misma base en todas las máquinas (ADR-000).
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: vokara
+      POSTGRES_PASSWORD: vokara_local_dev
+      POSTGRES_DB: vokara
+    volumes:
+      - vokara_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vokara -d vokara"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  # Tus datos se quedan en tu máquina (art. V): los CVs originales en
+  # vokara_data, sin cifrar (ADR-007), y la base en vokara_postgres.
+  vokara_data:
+  vokara_postgres:
