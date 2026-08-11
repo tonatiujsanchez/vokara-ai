@@ -67,9 +67,9 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 - [X] T002 Declarar dependencias y generar el lock en `backend/pyproject.toml` + `backend/uv.lock` (`uv lock`): FastAPI, pydantic v2, pydantic-settings, SQLAlchemy 2.0, Alembic, Celery 5, redis, pypdf, python-docx, langchain-core, langchain-google-genai, structlog, pgvector; dev: pytest, pytest-asyncio, testcontainers[postgres,redis], ruff, mypy. **Sin PyJWT, argon2, boto3 ni Sentry** (plan.md "Explícitamente fuera")
 - [X] T003 [P] Configurar ruff (lint + format) y `mypy --strict` en `backend/pyproject.toml`, crear `backend/app/py.typed` y activar el reporte de `# type: ignore` sin justificación
 - [X] T004 [P] Añadir `.pre-commit-config.yaml` en la raíz con ruff, ruff-format, mypy, `end-of-file-fixer` y `mixed-line-ending` fijado a LF
-- [ ] T005 [P] Andamiar el frontend con Vite 5 + React 18 + TypeScript strict en `frontend/`: `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`
-- [ ] T006 [P] Configurar Tailwind + shadcn/ui en `frontend/tailwind.config.ts` y `frontend/src/components/ui/`
-- [ ] T007 [P] Configurar Vitest + React Testing Library + MSW en `frontend/vitest.config.ts` y `frontend/tests/setup.ts`
+- [X] T005 [P] Andamiar el frontend con Vite 5 + React 18 + TypeScript strict en `frontend/`: `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`
+- [X] T006 [P] Configurar Tailwind + shadcn/ui en `frontend/tailwind.config.ts` y `frontend/src/components/ui/`
+- [X] T007 [P] Configurar Vitest + React Testing Library + MSW en `frontend/vitest.config.ts` y `frontend/tests/setup.ts`
 - [ ] T008 [P] Actualizar el `.env.example` **de la raíz** (ya existente) como única plantilla de configuración: dejar claro que **ninguna variable hace falta para arrancar** —las API keys las pide el wizard (FR-008)—, unificar `VOKARA_STORAGE_PATH` bajo el nombre `VOKARA_DATA_DIR` que usan plan y quickstart, y **eliminar `POSTGRES_*`, `DATABASE_URL` y `REDIS_URL`**, que pasan a ser literales del Compose por la decisión de configuración de arriba. **No se crea `infra/.env.example`**
 
 ---
