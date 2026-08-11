@@ -92,6 +92,10 @@ select = [
 # Alembic generates its own module-level scaffolding.
 "app/db/migrations/**" = ["ANN", "E501"]
 
+[tool.ruff.lint.isort]
+# `app` is installed into the environment as a package; say it is ours.
+known-first-party = ["app"]
+
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
 

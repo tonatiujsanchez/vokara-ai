@@ -87,7 +87,7 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 
 ### Configuración, logging y directorio de datos
 
-- [ ] T011 [P] `backend/app/core/config.py` — `Settings` con pydantic-settings leyendo el `.env` **de la raíz del repo**, precedencia **entorno > archivo > defaults**, `SecretStr` para toda credencial, `api_host` **con default a loopback** (lo que exige el test 2 de T014), `VOKARA_DATA_DIR`, nombres de modelo configurables y los umbrales de la feature (`MAX_UPLOAD_BYTES`, `MIN_DOC_CHARS`, `CLASSIFIER_CHARS`, `MAX_EXTRACTION_CHARS`, `MIN_SEEDED_ENTRIES`, intervalo de polling); test de precedencia y de `repr` redactado en `backend/tests/unit/test_config_precedence.py` (research R-21)
+- [X] T011 [P] `backend/app/core/config.py` — `Settings` con pydantic-settings leyendo el `.env` **de la raíz del repo**, precedencia **entorno > archivo > defaults**, `SecretStr` para toda credencial, `api_host` **con default a loopback** (lo que exige el test 2 de T014), `VOKARA_DATA_DIR`, nombres de modelo configurables y los umbrales de la feature (`MAX_UPLOAD_BYTES`, `MIN_DOC_CHARS`, `CLASSIFIER_CHARS`, `MAX_EXTRACTION_CHARS`, `MIN_SEEDED_ENTRIES`, intervalo de polling); test de precedencia y de `repr` redactado en `backend/tests/unit/test_config_precedence.py` (research R-21)
 - [ ] T012 [P] `backend/app/core/logging.py` — structlog con `request_id` y `parse_job_id`, más procesador que elimina claves sensibles por nombre y trunca texto libre; test en `backend/tests/unit/test_log_redaction.py` (research R-13)
 - [ ] T013 [P] `backend/app/core/data_dir.py` — resolución y verificación del directorio de datos local, con error accionable si no existe o no es escribible; test en `backend/tests/unit/test_data_dir.py`
 
