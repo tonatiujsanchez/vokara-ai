@@ -128,9 +128,9 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 
 ### CI bloqueante
 
-- [ ] T035 `.github/workflows/ci.yml` con todos los pasos **bloqueantes**: `ruff check` + `ruff format --check` → `mypy --strict` → `pytest` unit + integración con testcontainers **incluidos los dos tests de binding** → reversibilidad de migraciones → **drift del cliente TS** (`git diff --exit-code frontend/openapi.json frontend/src/api/schema.d.ts`) → `vitest` → build del front → build de imágenes (roadmap §9, research R-20)
-- [ ] T036 Job de **instalación limpia** en `.github/workflows/ci.yml`: sobre un runner virgen y **sin crear ningún `.env`**, ejecutar exactamente el comando documentado `docker compose -f infra/docker-compose.yml up -d` desde la raíz del repo y verificar que `GET /health` responde. Es la prueba de que la decisión de un solo `.env` en la raíz no rompe el arranque de un clon nuevo
-- [ ] T037 [P] Job de verificación de licencias de dependencias compatibles con AGPL-3.0 en `.github/workflows/ci.yml` (ADR-010)
+- [X] T035 `.github/workflows/ci.yml` con todos los pasos **bloqueantes**: `ruff check` + `ruff format --check` → `mypy --strict` → `pytest` unit + integración con testcontainers **incluidos los dos tests de binding** → reversibilidad de migraciones → **drift del cliente TS** (`git diff --exit-code frontend/openapi.json frontend/src/api/schema.d.ts`) → `vitest` → build del front → build de imágenes (roadmap §9, research R-20)
+- [X] T036 Job de **instalación limpia** en `.github/workflows/ci.yml`: sobre un runner virgen y **sin crear ningún `.env`**, ejecutar exactamente el comando documentado `docker compose -f infra/docker-compose.yml up -d` desde la raíz del repo y verificar que `GET /health` responde. Es la prueba de que la decisión de un solo `.env` en la raíz no rompe el arranque de un clon nuevo
+- [X] T037 [P] Job de verificación de licencias de dependencias compatibles con AGPL-3.0 en `.github/workflows/ci.yml` (ADR-010)
 
 ---
 
