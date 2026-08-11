@@ -148,11 +148,11 @@ cd backend && uv run pytest tests/integration/test_local_binding.py tests/archit
 cd ../frontend && npm run build                      # la pantalla de estado compila con tipos generados
 ```
 
-- [ ] Los cuatro servicios levantan con un solo `docker compose up`, **sin editar archivos a mano y sin `.env`**
-- [ ] Las migraciones se aplicaron **solas** al arranque; nadie ejecutó un comando de Alembic
-- [ ] `GET /health` viaja de Postgres al navegador con tipos generados desde OpenAPI, y renombrar un campo del esquema Pydantic **rompe el build de TypeScript** (prueba negativa de quickstart §2)
-- [ ] Los **dos** tests de binding del ADR-008 pasan **sin marca `xfail`**; el test de arquitectura del art. II pasa
-- [ ] `test_compose_env_contract.py` pasa: cero interpolaciones `${` y `env_file` apuntando a la raíz
+- [X] Los cuatro servicios levantan con un solo `docker compose up`, **sin editar archivos a mano y sin `.env`**
+- [X] Las migraciones se aplicaron **solas** al arranque; nadie ejecutó un comando de Alembic
+- [X] `GET /health` viaja de Postgres al navegador con tipos generados desde OpenAPI, y renombrar un campo del esquema Pydantic **rompe el build de TypeScript** (prueba negativa de quickstart §2)
+- [X] Los **dos** tests de binding del ADR-008 pasan **sin marca `xfail`**; el test de arquitectura del art. II pasa
+- [X] `test_compose_env_contract.py` pasa: cero interpolaciones `${` y `env_file` apuntando a la raíz
 - [ ] CI en verde con todos los pasos bloqueantes, incluida la instalación limpia
 
 ---
