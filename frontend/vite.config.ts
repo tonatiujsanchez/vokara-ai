@@ -15,7 +15,9 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8000",
+        // Inside the dev Compose the API answers by service name; on the host
+        // it answers on loopback.
+        target: process.env["VITE_API_PROXY_TARGET"] ?? "http://127.0.0.1:8000",
         changeOrigin: true,
       },
     },

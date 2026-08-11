@@ -1,0 +1,51 @@
+# Override de desarrollo: recarga en caliente y la SPA dentro del Compose.
+#
+# NO se carga solo. El comando documentado —`docker compose -f
+# infra/docker-compose.yml up`— usa únicamente el archivo base; para levantar
+# también esto hay que pedirlo:
+#
+#     docker compose -f infra/docker-compose.yml -f infra/docker-compose.override.yml up
+#
+# Rigen las mismas dos reglas del archivo base, y los mismos tests las
+# verifican: todo puerto publicado lleva IP de host loopback (ADR-008) y no hay
+# interpolación de variables.
+
+services:
+  api:
+    command:
+      - uvicorn
+      - app.main:app
+      - --reload
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    volumes:
+      - ../backend:/app
+      - vokara_data:/data
+
+  worker:
+    volumes:
+      - ../backend:/app
+      - vokara_data:/data
+
+  web:
+    # Tag fijo, igual que el resto de imágenes (ADR-000).
+    image: node:20-alpine
+    working_dir: /app
+    # Vite escucha en 0.0.0.0 dentro del contenedor por la misma razón que
+    # uvicorn: el proxy de Docker no alcanza un bind de loopback. La protección
+    # sigue siendo el mapeo de abajo.
+    command:
+      - sh
+      - -c
+      - "[ -d node_modules ] || npm ci; npm run dev -- --host 0.0.0.0"
+    environment:
+      # Dentro del Compose la API se alcanza por el nombre del servicio.
+      VITE_API_PROXY_TARGET: "http://api:8000"
+    volumes:
+      - ../frontend:/app
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      - api
