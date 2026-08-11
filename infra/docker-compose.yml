@@ -29,7 +29,12 @@ services:
       dockerfile: infra/docker/backend.Dockerfile
     # Aplica `alembic upgrade head` y después arranca uvicorn. Nadie ejecuta
     # Alembic a mano, ni al instalar ni al actualizar (roadmap §11.1).
+    #
+    # El `command` va explícito porque declarar `entrypoint` aquí BORRA el CMD
+    # de la imagen: sin él, el entrypoint migra, no recibe nada que ejecutar y
+    # el contenedor se reinicia en bucle.
     entrypoint: ["/usr/local/bin/entrypoint.sh"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       # Dentro del contenedor uvicorn DEBE escuchar en 0.0.0.0 o el proxy de
       # Docker no lo alcanza. Aquí la protección es el mapeo de puertos de

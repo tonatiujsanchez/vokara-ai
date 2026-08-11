@@ -122,3 +122,20 @@ def test_the_entrypoint_is_wired_in_the_image_and_in_the_compose() -> None:
     services = yaml.safe_load(COMPOSE_FILE.read_text(encoding="utf-8"))["services"]
     assert services["api"]["entrypoint"] == ["/usr/local/bin/entrypoint.sh"]
     assert services["worker"]["environment"]["VOKARA_APPLY_MIGRATIONS"] == "0"
+
+
+def test_a_service_overriding_the_entrypoint_declares_its_command() -> None:
+    """Declaring `entrypoint` in Compose clears the image's CMD.
+
+    Without an explicit command the entrypoint migrates, receives nothing to
+    exec and the container restarts in a loop — which is exactly what happened
+    the first time the Compose was brought up.
+    """
+    services = yaml.safe_load(COMPOSE_FILE.read_text(encoding="utf-8"))["services"]
+
+    for name, service in services.items():
+        if service.get("entrypoint"):
+            assert service.get("command"), (
+                f"{name} sobrescribe entrypoint y no declara command: "
+                "el CMD de la imagen queda vacío"
+            )
