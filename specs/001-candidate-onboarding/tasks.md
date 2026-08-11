@@ -83,7 +83,7 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 > El test del art. II se instala **antes de que existan las capas que debe vigilar**: ese es el momento en que es trivial de pasar y en que queda puesto para siempre.
 
 - [X] T009 Crear el esqueleto vacío de capas en `backend/app/`: `api/v1/`, `domain/`, `services/`, `adapters/{llm,storage,email,text_extraction}/`, `db/{models,repositories,migrations}/`, `workers/tasks/`, `core/`, cada uno con su `__init__.py`
-- [ ] T010 Test de arquitectura del art. II en `backend/tests/architecture/test_layer_dependencies.py`: falla si `api/` importa `db/`, si `adapters/` importa `services/` o `db/`, si `domain/` importa cualquier otra capa, o si `workers/tasks/` importa `db/` o `adapters/` directamente. Pasa de forma vacua sobre el esqueleto y queda instalado antes que las capas
+- [X] T010 Test de arquitectura del art. II en `backend/tests/architecture/test_layer_dependencies.py`: falla si `api/` importa `db/`, si `adapters/` importa `services/` o `db/`, si `domain/` importa cualquier otra capa, o si `workers/tasks/` importa `db/` o `adapters/` directamente. Pasa de forma vacua sobre el esqueleto y queda instalado antes que las capas
 
 ### Configuración, logging y directorio de datos
 

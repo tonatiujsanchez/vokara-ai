@@ -56,6 +56,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers --strict-config"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
@@ -92,9 +98,7 @@ ban-relative-imports = "all"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-# tests/ joins this list in T010, with the first test file (mypy errors out on
-# a directory that holds no .py files yet).
-files = ["app"]
+files = ["app", "tests"]
 warn_unreachable = true
 # `# type: ignore` without a code is an unjustified silence: report it (art. I).
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
