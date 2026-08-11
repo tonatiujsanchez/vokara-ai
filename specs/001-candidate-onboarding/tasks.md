@@ -114,7 +114,7 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 
 - [X] T025 [P] Modelos SQLAlchemy 2.0 tipados de primera ejecución en `backend/app/db/models/{candidate,setup_state,provider_configuration}.py`
 - [X] T026 [P] Modelos SQLAlchemy 2.0 tipados del perfil en `backend/app/db/models/{candidate_profile,profile_entry,profile_version}.py`
-- [ ] T027 [P] Modelos SQLAlchemy 2.0 tipados de documentos y trazas en `backend/app/db/models/{document,parse_job,llm_call_log}.py`
+- [X] T027 [P] Modelos SQLAlchemy 2.0 tipados de documentos y trazas en `backend/app/db/models/{document,parse_job,llm_call_log}.py`
 - [ ] T028 Repositorio base con **`candidate_id` explícito en toda firma** en `backend/app/db/repositories/base.py`, más test en `backend/tests/integration/test_repository_scoping_base.py` que siembra **dos** `candidate_id` y verifica el filtrado (research R-11, FR-049)
 
 ### API mínima y contrato tipado extremo a extremo
