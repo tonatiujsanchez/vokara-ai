@@ -1,7 +1,37 @@
 *:Zone.Identifier
 *Zone.Identifier*
+
+# Configuracion local: puede contener credenciales (art. V). El .env.example SI se commitea.
 .env
+.env.local
+
 # Entornos virtuales
 .venv*
 __pycache__/
 *.pyc
+
+# Herramientas de Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.egg-info/
+
+# Artefactos de build
+dist/
+build/
+*.tsbuildinfo
+
+# Node
+node_modules/
+.vite/
+
+# Datos locales del usuario: CVs originales sin cifrar (ADR-007). Nunca se commitean.
+data/
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+*.swp

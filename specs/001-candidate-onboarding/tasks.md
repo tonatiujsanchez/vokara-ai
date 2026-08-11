@@ -63,7 +63,7 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 
 **Propósito**: estructura de tres raíces del roadmap §5.1 y herramientas bloqueantes instaladas antes de la primera línea de lógica.
 
-- [ ] T001 Crear la estructura del monorepo `backend/`, `frontend/`, `infra/docker/` con `backend/app/` y `backend/tests/{unit,integration,architecture,evals}/`; añadir en la raíz `.gitattributes` con `* text=auto eol=lf`, `.python-version` (3.12) y `.nvmrc` (20 LTS), y ampliar `.gitignore` (ADR-000, research R-20)
+- [X] T001 Crear la estructura del monorepo `backend/`, `frontend/`, `infra/docker/` con `backend/app/` y `backend/tests/{unit,integration,architecture,evals}/`; añadir en la raíz `.gitattributes` con `* text=auto eol=lf`, `.python-version` (3.12) y `.nvmrc` (20 LTS), y ampliar `.gitignore` (ADR-000, research R-20)
 - [ ] T002 Declarar dependencias y generar el lock en `backend/pyproject.toml` + `backend/uv.lock` (`uv lock`): FastAPI, pydantic v2, pydantic-settings, SQLAlchemy 2.0, Alembic, Celery 5, redis, pypdf, python-docx, langchain-core, langchain-google-genai, structlog, pgvector; dev: pytest, pytest-asyncio, testcontainers[postgres,redis], ruff, mypy. **Sin PyJWT, argon2, boto3 ni Sentry** (plan.md "Explícitamente fuera")
 - [ ] T003 [P] Configurar ruff (lint + format) y `mypy --strict` en `backend/pyproject.toml`, crear `backend/app/py.typed` y activar el reporte de `# type: ignore` sin justificación
 - [ ] T004 [P] Añadir `.pre-commit-config.yaml` en la raíz con ruff, ruff-format, mypy, `end-of-file-fixer` y `mixed-line-ending` fijado a LF
