@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import lru_cache
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -28,18 +29,25 @@ def create_db_engine(url: str | None = None) -> Engine:
     )
 
 
-engine: Engine = create_db_engine()
-SessionFactory: sessionmaker[Session] = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    expire_on_commit=False,
-)
+@lru_cache(maxsize=1)
+def get_engine() -> Engine:
+    """One engine per process, built on first use.
+
+    Lazily rather than at import time so configuration read later — a test
+    pointing at a throwaway container, for instance — is not too late.
+    """
+    return create_db_engine()
+
+
+@lru_cache(maxsize=1)
+def get_session_factory() -> sessionmaker[Session]:
+    return sessionmaker(bind=get_engine(), autoflush=False, expire_on_commit=False)
 
 
 @contextmanager
 def session_scope() -> Iterator[Session]:
     """Transactional scope: commit on success, roll back on failure."""
-    session = SessionFactory()
+    session = get_session_factory()()
     try:
         yield session
         session.commit()
