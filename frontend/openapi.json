@@ -1,0 +1,67 @@
+{
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "properties": {
+          "database": {
+            "description": "`ok` cuando la base de datos responde.",
+            "title": "Database",
+            "type": "string"
+          },
+          "migration_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Revisión de Alembic aplicada, leída de la propia base.",
+            "title": "Migration Revision"
+          },
+          "status": {
+            "description": "`ok` cuando la instancia puede operar.",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "API local de Vokara. Sin autenticación (ADR-008): la instancia sirve a una sola persona, la que la instaló, y escucha únicamente en la interfaz local.",
+    "title": "Vokara API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "get_health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Estado de la instancia local",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  }
+}
