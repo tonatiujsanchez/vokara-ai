@@ -119,7 +119,7 @@ Queda registrado en [quickstart.md](./quickstart.md) §0 y §1, y el job de inst
 
 ### API mínima y contrato tipado extremo a extremo
 
-- [ ] T029 `backend/app/main.py` (app FastAPI, routers, middleware de `request_id`), `backend/app/api/errors.py` (excepción de dominio → `{code, message, details}` de `contracts/errors.md`) y `backend/app/api/deps.py` con `local_candidate_id` resuelto **desde configuración local**, nunca del cliente (FR-003)
+- [X] T029 `backend/app/main.py` (app FastAPI, routers, middleware de `request_id`), `backend/app/api/errors.py` (excepción de dominio → `{code, message, details}` de `contracts/errors.md`) y `backend/app/api/deps.py` con `local_candidate_id` resuelto **desde configuración local**, nunca del cliente (FR-003)
 - [ ] T030 `GET /health` en `backend/app/api/v1/health.py` devolviendo `{status, database, migration_revision}` leído de la base, más test de integración en `backend/tests/integration/test_health.py`. **Este es el endpoint que viaja de DB a UI en el checkpoint A**
 - [ ] T031 `backend/app/openapi_export.py` — vuelca `openapi.json` sin levantar servidor (`python -m app.openapi_export`), con test que verifica que el volcado es determinista (research R-16)
 - [ ] T032 Script `generate:api` en `frontend/package.json` (openapi-typescript) y generación **commiteada** de `frontend/openapi.json` y `frontend/src/api/schema.d.ts`
