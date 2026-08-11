@@ -123,7 +123,8 @@ previas).
 # ADR-003 — Google Gemini como proveedor LLM por defecto
 
 **Estado:** Aceptado · **Fecha:** 2026-07 · **Enmendado:** 2026-08 (pivote
-local-first: de proveedor único a default sugerido)
+local-first: de proveedor único a default sugerido) · **Nota añadida:**
+2026-08-11 (parámetros de muestreo y determinismo)
 
 ## Contexto
 Vokara usa LLM para: parseo de CV, parseo de JD, explicación de matches,
@@ -158,6 +159,32 @@ Asignación por tarea con Gemini (revisable con datos de costo real):
 - Clasificación y parseo estructurado → modelo rápido/económico de la familia.
 - Generación de materiales y simulador → modelo de mayor capacidad.
 - Embeddings → modelo de embeddings de Google.
+
+## Nota 2026-08-11 — parámetros de muestreo y determinismo
+
+**Los parámetros de muestreo —`temperature`, `top_p`, `top_k`— están deprecados
+en Gemini 3.x**, sustituidos por `thinking_level`, que controla el presupuesto de
+razonamiento del modelo y no la aleatoriedad del muestreo. No son equivalentes ni
+intercambiables: no existe un valor de `thinking_level` que "sea" `temperature=0`.
+
+Conviene precisar qué implica eso para el artículo III y qué no. **El determinismo
+que la constitución exige no proviene del parámetro de temperatura**, sino de la
+estructura del pipeline: esquema Pydantic tipado en cada frontera (art. I),
+decisiones de flujo tomadas fuera del LLM —el modelo es un componente con entrada
+y salida tipadas, nunca un agente que decide— y sub-scores calculados con reglas
+testeables (art. III, roadmap §4.5). `temperature=0` nunca fue lo que sostenía esa
+propiedad; tampoco garantizaba reproducibilidad exacta en ningún proveedor. Su
+desaparición no debilita el artículo III porque nunca fue su fundamento.
+
+Consecuencia vinculante para el adapter (arts. II y XI, ADR-011): **ningún
+adapter, servicio ni prompt debe asumir que `temperature` existe**. Los parámetros
+de muestreo son opcionales y propios de cada implementación del puerto —se pasan
+cuando el proveedor los admite y se omiten cuando no—, sin que `services/` se
+entere. Un `temperature=0` incrustado en la capa de servicios, o en la firma de
+`StructuredOutputPort`, es el mismo bug que un `if provider == "..."`: convierte
+el detalle de un proveedor en un requisito del dominio. Lo que verifica que la
+salida sigue siendo aceptable son las evals del golden set (art. VI), no la
+presencia de un parámetro.
 
 ## Alternativas descartadas
 - **OpenAI:** el equipo ya lo conoce por ALPHA y su calidad no está en

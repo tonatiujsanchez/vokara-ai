@@ -116,16 +116,43 @@ más común y más caro: un proveedor que rellena campos opcionales con texto
 inventado en vez de dejarlos vacíos no rompe el parseo —produce afirmaciones sin
 sustento, que es lo que el artículo IV existe para impedir—.
 
-| Proveedor | Salida estructurada | Respeta `null` en opcionales | Embeddings | Dimensión | Verificado (fecha) |
-|---|---|---|---|---|---|
-| Google Gemini | pendiente | pendiente | pendiente | pendiente | pendiente |
-| OpenAI | pendiente | pendiente | pendiente | pendiente | pendiente |
-| Anthropic | pendiente | pendiente | **No ofrece** | n/a | pendiente |
-| DeepSeek | pendiente | pendiente | pendiente | pendiente | pendiente |
-| Kimi / Moonshot | pendiente | pendiente | pendiente | pendiente | pendiente |
+| Proveedor | Modelo de generación | Salida estructurada | Respeta `null` en opcionales | Embeddings | Dimensión | Verificado (fecha) |
+|---|---|---|---|---|---|---|
+| google | `gemini-3.5-flash-lite` | Sí | Sí | OK | 768 | 2026-08-11 |
+| OpenAI | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente |
+| Anthropic | pendiente | pendiente | pendiente | **No ofrece** | n/a | pendiente |
+| DeepSeek | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente |
+| Kimi / Moonshot | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente |
 
 Un proveedor con verificación "pendiente" **no se anuncia como soportado en la
 UI ni en el README**: aparece cuando su fila está completa.
+
+### Notas de la verificación de Google (2026-08-11)
+
+- **Método.** Esquema Pydantic anidado con campos opcionales, aplicado sobre un
+  CV deliberadamente incompleto: sin teléfono, sin años de experiencia
+  declarados, un empleo sin fechas ni logros y una educación sin título. El
+  criterio de aprobación no es que el parseo funcione, sino que el modelo
+  devuelva `null` en esos campos **en vez de inventar valores plausibles** —que
+  es el modo de fallo que el artículo IV existe para impedir—. Latencia
+  observada: 1.54 s.
+- **Dimensión de embeddings.** `gemini-embedding-001` devuelve **3072** por
+  defecto, pero soporta truncado MRL vía `output_dimensionality`. Se fija en
+  **768** para ahorrar espacio en pgvector sin pérdida relevante de calidad. Ese
+  valor queda registrado como `embedding_dim` junto a cada vector (ADR-003), de
+  modo que un cambio futuro de dimensión sea detectable y re-embebible, no una
+  corrupción silenciosa.
+- **Parámetros de muestreo.** `temperature`, `top_p` y `top_k` están
+  **DEPRECADOS en Gemini 3.x**. El adapter **no debe asumir que existen**. El
+  determinismo que exige el artículo III proviene de la estructura del pipeline
+  —esquema tipado en cada frontera, decisiones de flujo fuera del LLM, reglas
+  testeables—, no del parámetro de temperatura (ver nota del ADR-003).
+- **Nombres de modelo.** Google retiró `gemini-2.0-flash` el **1 de junio de
+  2026**. Los nombres de modelo **NO deben vivir en constantes de código**: van
+  en configuración, con override por variable de entorno y con un **mensaje de
+  error accionable** cuando el modelo configurado ya no exista. Un proveedor que
+  deprecia un modelo no debe poder romper una instalación que el usuario no
+  actualizó (ADR-009: actualizar depende de él).
 
 ## Consecuencias
 

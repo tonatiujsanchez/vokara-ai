@@ -1,2 +1,7 @@
 *:Zone.Identifier
 *Zone.Identifier*
+.env
+# Entornos virtuales
+.venv*
+__pycache__/
+*.pyc
