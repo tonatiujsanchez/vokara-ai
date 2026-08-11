@@ -1,0 +1,1 @@
+"""Vokara backend application package."""
