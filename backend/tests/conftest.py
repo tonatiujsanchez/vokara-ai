@@ -22,6 +22,8 @@ from sqlalchemy.orm import Session
 from testcontainers.community.postgres import PostgresContainer
 from testcontainers.community.redis import RedisContainer
 
+from app.core.config import get_settings
+
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 # Same image and major version as infra/docker-compose.yml.
 POSTGRES_IMAGE = "pgvector/pgvector:pg16"
@@ -68,7 +70,10 @@ def alembic_config(database_url: str) -> Config:
 @pytest.fixture(scope="session")
 def migrated_database(database_url: str) -> str:
     """Bring the schema to head once per session, the way startup does."""
+    # Anything that reads Settings from here on must see the throwaway
+    # database, not whatever the developer has in their .env.
     os.environ["DATABASE_URL"] = database_url
+    get_settings.cache_clear()
     command.upgrade(alembic_config(database_url), "head")
     return database_url
 

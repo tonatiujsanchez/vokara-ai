@@ -23,7 +23,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Settings is the fallback, not an override: whoever invokes Alembic with an
+# explicit URL — the reversibility test against a throwaway container, a
+# maintenance script — must win over the ambient configuration.
+if not config.get_main_option("sqlalchemy.url", None):
+    config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
 
