@@ -27,6 +27,9 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/backend.Dockerfile
+    # Aplica `alembic upgrade head` y después arranca uvicorn. Nadie ejecuta
+    # Alembic a mano, ni al instalar ni al actualizar (roadmap §11.1).
+    entrypoint: ["/usr/local/bin/entrypoint.sh"]
     environment:
       # Dentro del contenedor uvicorn DEBE escuchar en 0.0.0.0 o el proxy de
       # Docker no lo alcanza. Aquí la protección es el mapeo de puertos de
@@ -69,6 +72,9 @@ services:
     # infraestructura sin consumidor (research R-28).
     command: ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info"]
     environment:
+      # El worker comparte imagen con la api y no migra: dos procesos aplicando
+      # la misma migración a la vez es una carrera sin premio. Migra la api.
+      VOKARA_APPLY_MIGRATIONS: "0"
       DATABASE_URL: "postgresql+psycopg://vokara:vokara_local_dev@postgres:5432/vokara"
       REDIS_URL: "redis://redis:6379/0"
       VOKARA_DATA_DIR: "/data"

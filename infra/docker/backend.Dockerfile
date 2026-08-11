@@ -35,6 +35,8 @@ COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
 COPY backend/ /app/
+COPY infra/docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Usuario sin privilegios. /data se crea aquí y con este dueño para que el
 # volumen nombrado herede la propiedad al montarse: si no, el contenedor no
@@ -47,6 +49,7 @@ USER vokara
 
 EXPOSE 8000
 
-# Sin migraciones todavía: el entrypoint que ejecuta `alembic upgrade head`
-# antes de uvicorn llega en T024, cuando ya haya una migración que aplicar.
+# El entrypoint aplica `alembic upgrade head` antes de arrancar lo que reciba:
+# el usuario nunca ejecuta Alembic a mano (roadmap §11.1).
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
