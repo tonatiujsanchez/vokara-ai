@@ -45,7 +45,7 @@ Eso es todo. Las migraciones se aplican **solas** al arranque (roadmap §11.1): 
 **Verificación de que el entorno está sano:**
 
 ```bash
-curl -s localhost:8000/health                              # {"status":"ok"}
+curl -s localhost:8000/api/v1/health                       # {"status":"ok","database":"ok","migration_revision":"0001"}
 docker compose exec postgres psql -U vokara -c "\dx"       # extensión vector presente
 docker compose ps                                          # api, worker, postgres, redis — cuatro, ni uno más
 ```
