@@ -8,175 +8,344 @@ openapi: 3.1.0
 
 info:
   title: Vokara API — Onboarding del candidato
-  version: "0.1.0"
+  version: "0.2.0"
   description: |
     Endpoints de la feature 001. Todos los mensajes de error viajan en español
     (art. IX) acompañados de un `code` estable en inglés que el frontend usa
     para decidir comportamiento, nunca para construir el texto.
 
-    El `candidate_id` se deriva SIEMPRE del token de acceso. Ningún endpoint lo
-    acepta como parámetro (FR-034).
+    SIN AUTENTICACIÓN (ADR-008). No hay registro, login, sesiones ni tokens: la
+    instancia sirve a una sola persona, la que la instaló, y escucha únicamente
+    en la interfaz local. El `candidate_id` lo resuelve SIEMPRE la capa de API
+    desde la configuración local; ningún endpoint lo acepta como parámetro, ni
+    en ruta, ni en query, ni en cuerpo, ni en cabecera (FR-003, FR-049).
+
+    NINGUNA RESPUESTA EXPONE UNA CREDENCIAL, ni completa ni parcialmente. El
+    estado consultable de una credencial es exactamente
+    `configured | not_configured | rejected` (FR-008, FR-013, SC-013).
+
+    EL FRONTEND NO RAMIFICA POR PROVEEDOR (art. XI): recibe el catálogo de
+    opciones ofrecibles y los mensajes ya resueltos, y los renderiza.
 
 servers:
   - url: /api/v1
 
 tags:
-  - name: auth
-    description: ADR-001. Precondición de la feature, sin FRs propios en 001.
-  - name: privacy
-    description: Aviso de privacidad y consentimiento (FR-030).
+  - name: setup
+    description: Primera ejecución — divulgación, proveedores con preflight y correo (FR-001 – FR-015).
   - name: documents
-    description: Subida y consulta del CV maestro (FR-001 – FR-006).
+    description: Subida y consulta del CV maestro (FR-016 – FR-018).
   - name: parse-jobs
-    description: Estado y reintento del procesamiento (FR-004, FR-008).
+    description: Estado y reintento del procesamiento (FR-019, FR-023).
   - name: profile
-    description: Perfil maestro, objetivos y confirmación (FR-014 – FR-029).
+    description: Perfil maestro, objetivos y confirmación (FR-029, FR-035 – FR-044).
   - name: profile-entries
-    description: Entradas atómicas del perfil (FR-009 – FR-018).
+    description: Entradas atómicas del perfil (FR-024 – FR-028, FR-030 – FR-033).
   - name: profile-versions
-    description: Historial inmutable de versiones (FR-025, FR-026).
-
-security:
-  - bearerAuth: []
+    description: Historial inmutable de versiones (FR-040, FR-041).
 
 paths:
-  # ─────────────────────────────── auth (ADR-001) ───────────────────────────
-  /auth/register:
-    post:
-      tags: [auth]
-      summary: Registra un candidato
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/RegisterRequest' }
-      responses:
-        '201':
-          description: Cuenta creada; sesión iniciada
-          headers:
-            Set-Cookie:
-              description: refresh token opaco (httpOnly, Secure, SameSite=Lax)
-              schema: { type: string }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TokenResponse' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
-  /auth/login:
-    post:
-      tags: [auth]
-      summary: Inicia sesión
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/LoginRequest' }
-      responses:
-        '200':
-          description: Sesión iniciada
-          headers:
-            Set-Cookie:
-              schema: { type: string }
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/TokenResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
-  /auth/refresh:
-    post:
-      tags: [auth]
-      summary: Rota el refresh token y emite un access token nuevo
+  # ───────────────────────── primera ejecución (wizard) ─────────────────────
+  /setup/state:
+    get:
+      tags: [setup]
+      summary: Estado de la primera ejecución y paso pendiente (FR-014, FR-015)
       description: |
-        Lee el refresh token de la cookie. Presentar un token ya usado revoca
-        toda la familia (detección de reuso, ADR-001) y devuelve 401.
-      security: []
+        Punto de entrada de la SPA. `pending_step` se DERIVA de los hechos
+        registrados —acuse, preflight de cada capacidad, estado del paso de
+        correo—, nunca de un puntero persistido (research R-18). Al reabrir la
+        aplicación se retoma exactamente en el paso pendiente, sin volver a
+        pedir el acuse ni las credenciales ya verificadas.
+
+        Si una credencial cambió fuera de la aplicación, su preflight queda
+        invalidado y `pending_step` vuelve a `providers` SOLO para esa
+        capacidad (research R-24, SC-012).
       responses:
         '200':
-          description: Tokens rotados
-          headers:
-            Set-Cookie:
-              schema: { type: string }
+          description: Estado del wizard
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/TokenResponse' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '429': { $ref: '#/components/responses/RateLimited' }
+              schema: { $ref: '#/components/schemas/SetupState' }
 
-  /auth/logout:
-    post:
-      tags: [auth]
-      summary: Cierra la sesión y revoca la familia de refresh tokens
-      responses:
-        '204': { description: Sesión cerrada }
-
-  /auth/me:
+  /setup/disclosure:
     get:
-      tags: [auth]
-      summary: Datos de la cuenta autenticada
+      tags: [setup]
+      summary: Texto vigente de la divulgación y estado de su acuse (FR-001)
+      description: |
+        Devuelve el texto COMPLETO para mostrarlo en pantalla. El art. V
+        prohíbe que la divulgación sea solo un enlace o solo el README.
       responses:
         '200':
-          description: Cuenta
+          description: Divulgación vigente
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Candidate' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+              schema: { $ref: '#/components/schemas/Disclosure' }
 
-  # ─────────────────────────────── privacidad ───────────────────────────────
-  /privacy-policy:
-    get:
-      tags: [privacy]
-      summary: Aviso de privacidad vigente y estado del consentimiento
-      responses:
-        '200':
-          description: Aviso vigente
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/PrivacyPolicyStatus' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /consents:
+  /setup/disclosure-acknowledgement:
     post:
-      tags: [privacy]
-      summary: Registra el consentimiento explícito del candidato (FR-030)
+      tags: [setup]
+      summary: Registra el acuse explícito de la divulgación (FR-002)
+      description: |
+        Acuse afirmativo y explícito: NUNCA preseleccionado, NUNCA inferido de
+        continuar. Se registra con marca de tiempo y con la versión del texto
+        efectivamente acusado. Sin él, ningún endpoint del onboarding responde
+        (gate de servidor, SC-011).
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [policy_version]
+              required: [disclosure_version, acknowledged]
               properties:
-                policy_version: { type: string, examples: ["2026-08-01"] }
+                disclosure_version: { type: string, examples: ["2026-08-11"] }
+                acknowledged: { type: boolean, const: true }
       responses:
         '201':
-          description: Consentimiento registrado
+          description: Acuse registrado
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Consent' }
+              schema: { $ref: '#/components/schemas/SetupState' }
         '409':
-          description: Ya existe consentimiento para esa versión
+          description: Ya existe acuse para esa versión
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidationError' }
 
+  /setup/providers/catalog:
+    get:
+      tags: [setup]
+      summary: Proveedores ofrecibles por capacidad, con su costo estimado (FR-004, FR-005, FR-009)
+      description: |
+        Lista CERRADA. Solo aparecen los proveedores cuya verificación empírica
+        está registrada (FR-009); un proveedor sin verificar no se ofrece. No
+        existe forma de configurar un endpoint arbitrario en v1.
+
+        El costo estimado por mes de búsqueda activa viaja aquí para que el
+        frontend pueda mostrarlo ANTES de pedir ninguna API key (FR-005), con
+        el supuesto de uso a la vista y estimado por separado para generación
+        y para embeddings.
+      responses:
+        '200':
+          description: Catálogo por capacidad
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderCatalog' }
+
+  /setup/providers/{capability}:
+    parameters:
+      - { name: capability, in: path, required: true, schema: { $ref: '#/components/schemas/Capability' } }
+    get:
+      tags: [setup]
+      summary: Configuración vigente de una capacidad
+      responses:
+        '200':
+          description: Configuración, o `null` si no hay ninguna
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/ProviderConfiguration' }
+                  - { type: 'null' }
+    put:
+      tags: [setup]
+      summary: Configura una capacidad y ejecuta su preflight (FR-004, FR-006, FR-007)
+      description: |
+        Generación y embeddings se configuran de forma INDEPENDIENTE: pueden
+        ser el mismo proveedor o dos distintos, y ninguna elección condiciona a
+        la otra (ADR-011). Si el usuario elige el mismo proveedor para ambas,
+        la llave se pide una sola vez y cada capacidad se verifica por separado.
+
+        El preflight se ejecuta AQUÍ, al guardar, nunca diferido al primer uso
+        real (FR-006). La respuesta 200 lleva SIEMPRE un `preflight` con una de
+        las cuatro variantes de FR-007, incluidas las que no permiten avanzar:
+        no son errores de transporte, son resultados de la verificación.
+
+        La API key viaja en el cuerpo, se usa para el preflight y se escribe en
+        la CONFIGURACIÓN LOCAL. NUNCA se persiste en la base de datos y NUNCA
+        vuelve en ninguna respuesta (FR-008).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, api_key]
+              properties:
+                provider:
+                  type: string
+                  description: Identificador del catálogo cerrado. Debe tener verificación registrada (FR-009).
+                api_key:
+                  type: string
+                  format: password
+                  description: Credencial del usuario. Write-only; jamás se devuelve.
+                model:
+                  type: [string, 'null']
+                  description: |
+                    Opcional. Si se omite, se usa el modelo por defecto de la
+                    configuración. Los nombres de modelo NUNCA viven en
+                    constantes de código (ADR-011).
+      responses:
+        '200':
+          description: |
+            Preflight ejecutado. Ver `preflight.result` para saber si la
+            capacidad quedó disponible.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderConfiguration' }
+        '400':
+          description: |
+            `code` ∈ {PROVIDER_CREDENTIAL_REJECTED, MODEL_NOT_AVAILABLE}
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: |
+            `code` = PROVIDER_NOT_OFFERED — proveedor sin verificación
+            registrada o fuera de la lista cerrada (FR-009).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: |
+            `code` = PROVIDER_QUOTA_EXCEEDED. La credencial SIRVE, la cuota no
+            (FR-007.4). Nunca se presenta como credencial inválida.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: |
+            `code` = PROVIDER_UNREACHABLE — no se pudo verificar. Se distingue
+            explícitamente de una llave inválida y permite reintentar sin
+            volver a escribirla.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /setup/providers/{capability}/degradation-acknowledgement:
+    post:
+      tags: [setup]
+      summary: Acuse específico de una degradación explícita (FR-007.3, SC-016)
+      description: |
+        Solo aplica cuando el preflight resultó `capability_unverified`. El
+        sistema ya enumeró qué funciones concretas quedan afectadas y por qué,
+        y ofreció cambiar de proveedor; este acuse es lo único que permite
+        continuar así. PROHIBIDA la degradación silenciosa.
+      parameters:
+        - { name: capability, in: path, required: true, schema: { $ref: '#/components/schemas/Capability' } }
+      responses:
+        '201':
+          description: Acuse registrado; la capacidad queda utilizable con la degradación declarada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProviderConfiguration' }
+        '409':
+          description: El preflight vigente no es `capability_unverified`; no hay degradación que acusar
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /setup/email:
+    get:
+      tags: [setup]
+      summary: Estado del paso de correo y su divulgación previa (FR-011, FR-012)
+      description: |
+        Incluye el texto de la divulgación obligatoria que debe mostrarse ANTES
+        de pedir credencial alguna: que una App Password da acceso a TODA la
+        bandeja y que leer solo la etiqueta designada es un compromiso de
+        Vokara verificado por sus propias pruebas, no un límite que Google
+        imponga; y que las cuentas de Workspace y de Protección Avanzada no
+        admiten App Passwords, con el enlace a la vía OAuth.
+      responses:
+        '200':
+          description: Estado del paso de correo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailStep' }
+
+  /setup/email/link:
+    post:
+      tags: [setup]
+      summary: Vincula la cuenta de correo y verifica la etiqueta designada (FR-013)
+      description: |
+        Verifica que la etiqueta EXISTE y es alcanzable antes de dar la
+        vinculación por establecida. La App Password se escribe en la
+        configuración local con las mismas reglas que las API keys: nunca en la
+        base de datos, nunca en logs ni en mensajes de error (FR-008, FR-013).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email_address, app_password, label]
+              properties:
+                email_address: { type: string, format: email }
+                app_password: { type: string, format: password, description: Write-only; jamás se devuelve. }
+                label: { type: string, description: Etiqueta de Gmail a la que Vokara restringe cada consulta. }
+      responses:
+        '200':
+          description: Vinculación establecida y etiqueta verificada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailStep' }
+        '400':
+          description: |
+            `code` = EMAIL_APP_PASSWORD_REJECTED. El paso sigue siendo omitible
+            sin consecuencias.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: |
+            `code` = EMAIL_LABEL_NOT_FOUND — la etiqueta no existe o no es
+            alcanzable. La vinculación NO se da por buena.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: '`code` = EMAIL_PROVIDER_UNREACHABLE'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /setup/email/skip:
+    post:
+      tags: [setup]
+      summary: Omite el paso de correo (FR-011)
+      description: |
+        Paso opcional y visiblemente opcional: omitible con una sola acción y
+        con el mismo peso visual que continuar. Omitirlo NUNCA bloquea el
+        onboarding ni deshabilita ninguna funcionalidad de esta feature.
+      responses:
+        '200':
+          description: Paso omitido; la primera ejecución puede concluir
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupState' }
+
   # ─────────────────────────────── documentos ───────────────────────────────
   /documents:
     post:
       tags: [documents]
-      summary: Sube el CV maestro y encola su procesamiento (FR-001 – FR-004)
+      summary: Sube el CV maestro y encola su procesamiento (FR-016 – FR-019)
       description: |
         Validación síncrona antes de encolar: tamaño ≤ 10 MB, tipo real por
         firma de bytes (no por extensión) y legibilidad del archivo. Un rechazo
         aquí NO crea documento ni entradas (SC-008).
 
-        Requiere consentimiento vigente (FR-030) y que no exista otro
-        procesamiento activo del mismo candidato.
+        Gates de la primera ejecución, evaluados ANTES que la validación del
+        archivo y aplicados en el SERVIDOR (no solo en el guard de la SPA):
+        acuse de divulgación registrado (FR-002, SC-011) y proveedor de
+        GENERACIÓN con preflight resuelto (FR-010). La ausencia de proveedor de
+        embeddings NUNCA bloquea esta operación.
+
+        Requiere además que no exista otro procesamiento activo.
+
+        El archivo se conserva como respaldo en el directorio de datos local,
+        SIN cifrado en reposo (FR-018, ADR-007). Su `storage_key` nunca se
+        expone en ninguna respuesta.
       requestBody:
         required: true
         content:
@@ -204,13 +373,9 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
           description: |
-            `code` ∈ {CONSENT_REQUIRED, PARSE_JOB_ALREADY_ACTIVE,
+            `code` ∈ {DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED,
+            GENERATION_PROVIDER_REQUIRED, PARSE_JOB_ALREADY_ACTIVE,
             PROFILE_ALREADY_SEEDED}. El último se reserva para la feature 007.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '413':
-          description: Cuerpo excedido en el proxy
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -246,12 +411,11 @@ paths:
                 oneOf:
                   - { $ref: '#/components/schemas/ParseJob' }
                   - { type: 'null' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /parse-jobs/{job_id}:
     get:
       tags: [parse-jobs]
-      summary: Estado del procesamiento (FR-004)
+      summary: Estado del procesamiento (FR-019)
       parameters:
         - { name: job_id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -265,7 +429,7 @@ paths:
   /parse-jobs/{job_id}/retry:
     post:
       tags: [parse-jobs]
-      summary: Reintenta un procesamiento fallido (FR-008)
+      summary: Reintenta un procesamiento fallido (FR-023)
       description: |
         Solo se acepta sobre un trabajo en estado `failed`. Crea un trabajo
         nuevo sobre el mismo documento; la siembra es aditiva y nunca borra
@@ -293,8 +457,8 @@ paths:
       summary: Perfil maestro del candidato autenticado
       description: |
         Devuelve el trabajo en curso más el estado derivado: paso del onboarding
-        (FR-019 / US2 AC5), bloqueadores de confirmación (FR-024) y si hay
-        cambios sin confirmar (FR-029). El perfil se crea de forma perezosa: si
+        (research R-18, US3 AC5), bloqueadores de confirmación (FR-039) y si hay
+        cambios sin confirmar (FR-044). El perfil se crea de forma perezosa: si
         no existe, se devuelve uno vacío en estado `draft`.
       responses:
         '200':
@@ -302,15 +466,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Profile' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /profile/objectives:
     patch:
       tags: [profile]
-      summary: Actualiza el cuestionario de objetivos (FR-020 – FR-022)
+      summary: Actualiza el cuestionario de objetivos (FR-035 – FR-037)
       description: |
         Actualización parcial. `salary_min` no puede superar a `salary_max` y la
-        moneda es obligatoria si hay cualquier valor salarial (FR-021); el error
+        moneda es obligatoria si hay cualquier valor salarial (FR-036); el error
         se explica en español.
       requestBody:
         required: true
@@ -328,12 +491,12 @@ paths:
   /profile/confirm:
     post:
       tags: [profile]
-      summary: Confirmación explícita del candidato (FR-023 – FR-025, art. X)
+      summary: Confirmación explícita del candidato (FR-038 – FR-040, art. X)
       description: |
         ÚNICO camino por el que un perfil llega a `complete`. Crea una versión
         inmutable con el contenido íntegro (entradas vivas + objetivos) y la
         deja como versión vigente. Sobre un perfil ya `complete`, confirma los
-        cambios pendientes creando una versión nueva (FR-029) sin cambiar el
+        cambios pendientes creando una versión nueva (FR-044) sin cambiar el
         estado.
       responses:
         '201':
@@ -351,7 +514,7 @@ paths:
         '422':
           description: |
             `code` = CONFIRMATION_BLOCKED. `details.blockers` enumera exactamente
-            qué falta (FR-024).
+            qué falta (FR-039).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -359,7 +522,7 @@ paths:
   /profile/pending-changes:
     get:
       tags: [profile]
-      summary: Detalle de los cambios sin confirmar (FR-029)
+      summary: Detalle de los cambios sin confirmar (FR-044)
       description: |
         Diff determinista entre el trabajo en curso y la versión vigente. Si no
         hay versión vigente, `has_changes` es falso y las listas van vacías: todo
@@ -375,7 +538,7 @@ paths:
   /profile/entries:
     get:
       tags: [profile-entries]
-      summary: Lista las entradas vivas del perfil (FR-015)
+      summary: Lista las entradas vivas del perfil (FR-030)
       parameters:
         - name: entry_type
           in: query
@@ -395,7 +558,7 @@ paths:
                     items: { $ref: '#/components/schemas/ProfileEntry' }
     post:
       tags: [profile-entries]
-      summary: Crea una entrada nueva (FR-018, FR-007)
+      summary: Crea una entrada nueva (FR-033, FR-022)
       description: Se registra siempre con origen `user_added`.
       requestBody:
         required: true
@@ -425,9 +588,9 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
     patch:
       tags: [profile-entries]
-      summary: Edita una entrada (FR-016)
+      summary: Edita una entrada (FR-031)
       description: |
-        El identificador NUNCA cambia (FR-010). Si la entrada tenía origen
+        El identificador NUNCA cambia (FR-025). Si la entrada tenía origen
         `cv_seed` y el contenido cambia de verdad, pasa a `user_edited`; un
         guardado sin cambios no altera el origen. Las entradas `user_added`
         conservan su origen (ver research.md R-09).
@@ -448,7 +611,7 @@ paths:
         '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [profile-entries]
-      summary: Elimina una entrada del perfil (FR-017)
+      summary: Elimina una entrada del perfil (FR-032)
       parameters:
         - { name: entry_id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -459,7 +622,7 @@ paths:
   /profile/versions:
     get:
       tags: [profile-versions]
-      summary: Historial de versiones confirmadas (FR-026)
+      summary: Historial de versiones confirmadas (FR-041)
       responses:
         '200':
           description: Versiones, de la más reciente a la más antigua
@@ -476,7 +639,7 @@ paths:
   /profile/versions/{version_id}:
     get:
       tags: [profile-versions]
-      summary: Contenido íntegro de una versión pasada (FR-026)
+      summary: Contenido íntegro de una versión pasada (FR-041)
       parameters:
         - { name: version_id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -488,29 +651,16 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
 
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-      description: Access token de vida corta, mantenido en memoria del frontend (ADR-001).
+  # Sin `securitySchemes`: no hay autenticación (ADR-008). El único control de
+  # acceso es dónde escucha la instancia — puertos publicados solo en 127.0.0.1,
+  # verificado por tests/integration/test_local_binding.py.
 
   responses:
-    Unauthorized:
-      description: Token ausente, inválido, expirado o revocado
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
     NotFound:
       description: |
-        El recurso no existe o no pertenece al candidato autenticado. Se
-        responde 404 (no 403) para no revelar la existencia de recursos ajenos
-        (FR-034).
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    Conflict:
-      description: Conflicto con el estado actual del recurso
+        El recurso no existe o no pertenece al `candidate_id` de la instalación.
+        Se responde 404 (no 403) para no revelar la existencia de recursos
+        ajenos (FR-049).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -519,15 +669,6 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-    RateLimited:
-      description: Demasiadas solicitudes (ADR-001)
-      headers:
-        Retry-After:
-          schema: { type: integer }
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-
   schemas:
     Error:
       type: object
@@ -541,59 +682,240 @@ components:
           type: string
           description: |
             Mensaje accionable en español (art. IX). NUNCA incluye contenido del
-            documento ni datos personales (FR-031).
+            documento ni datos personales (FR-045).
           examples: ["Tu PDF no tiene texto seleccionable..."]
         details:
           type: object
           additionalProperties: true
           description: Información estructurada específica del error (campos inválidos, bloqueadores).
 
-    RegisterRequest:
-      type: object
-      required: [email, password]
-      properties:
-        email: { type: string, format: email }
-        password: { type: string, minLength: 12, maxLength: 128 }
+    # ─────────────────── primera ejecución (wizard) ────────────────────
+    Capability:
+      type: string
+      description: |
+        Las dos capacidades que se configuran de forma INDEPENDIENTE (ADR-011).
+        Ninguna feature consulta el nombre del proveedor: consulta la capacidad.
+      enum: [generation, embeddings]
 
-    LoginRequest:
-      type: object
-      required: [email, password]
-      properties:
-        email: { type: string, format: email }
-        password: { type: string }
+    SetupStep:
+      type: string
+      description: Paso pendiente del wizard, DERIVADO de los hechos registrados (research R-18).
+      enum: [disclosure, providers, email]
 
-    TokenResponse:
-      type: object
-      required: [access_token, token_type, expires_in]
-      properties:
-        access_token: { type: string }
-        token_type: { type: string, const: bearer }
-        expires_in: { type: integer, description: Segundos de vida del access token, examples: [900] }
+    CredentialStatus:
+      type: string
+      description: |
+        Único estado de una credencial que la API expone. NUNCA se devuelve la
+        llave, ni siquiera parcialmente (FR-008, FR-013, SC-013).
+      enum: [configured, not_configured, rejected]
 
-    Candidate:
-      type: object
-      required: [id, email, created_at]
-      properties:
-        id: { type: string, format: uuid }
-        email: { type: string, format: email }
-        created_at: { type: string, format: date-time }
+    PreflightResult:
+      type: string
+      description: |
+        Los CUATRO resultados que FR-007 exige distinguir, más el caso de
+        entorno `provider_unreachable`, que no es un resultado de capacidad: se
+        comunica como "no se pudo verificar", nunca como credencial inválida.
+      enum:
+        - verified
+        - capability_unverified
+        - credential_rejected
+        - quota_exceeded
+        - provider_unreachable
 
-    PrivacyPolicyStatus:
+    AffectedFeature:
       type: object
-      required: [current_version, url, has_accepted_current]
+      description: Función concreta afectada por una degradación (FR-007.3, SC-016).
+      required: [code, message]
       properties:
-        current_version: { type: string }
-        url: { type: string, format: uri }
-        has_accepted_current: { type: boolean }
-        accepted_at: { type: [string, 'null'], format: date-time }
+        code: { type: string, enum: [CV_PARSING, SEMANTIC_MATCHING] }
+        message: { type: string, description: Explicación en español de qué deja de funcionar y por qué. }
 
-    Consent:
+    Disclosure:
       type: object
-      required: [policy_version, accepted_at]
+      description: |
+        Texto COMPLETO de la divulgación del art. V, para mostrarse en pantalla
+        (FR-001). Nunca solo un enlace, nunca solo el README.
+      required: [version, body_md, acknowledged]
       properties:
-        policy_version: { type: string }
-        accepted_at: { type: string, format: date-time }
+        version: { type: string, examples: ["2026-08-11"] }
+        body_md:
+          type: string
+          description: |
+            Texto en español. Cubre los cuatro puntos obligatorios de FR-001:
+            qué se queda en la máquina; la ÚNICA excepción, con qué se envía y
+            cuándo; que Vokara no envía nada a sus creadores; y que los archivos
+            quedan SIN CIFRAR en el disco (ADR-007), con la recomendación de
+            activar el cifrado de disco del sistema operativo.
+        acknowledged: { type: boolean }
+        acknowledged_at: { type: [string, 'null'], format: date-time }
+        acknowledged_version:
+          type: [string, 'null']
+          description: |
+            Versión efectivamente acusada. Guardarla es lo que permite exigir un
+            acuse nuevo si el texto cambia, en vez de darlo por cubierto por uno
+            viejo que decía otra cosa (research R-29).
 
+    ProviderOption:
+      type: object
+      description: |
+        Opción ofrecible. Solo aparece si su verificación empírica está
+        registrada (FR-009). El frontend la renderiza sin conocer proveedores.
+      required: [provider, display_name, is_suggested_default, credential_url, estimated_cost]
+      properties:
+        provider: { type: string, examples: ["google"] }
+        display_name: { type: string }
+        is_suggested_default:
+          type: boolean
+          description: Gemini es el default sugerido para ambas capacidades por su capa gratuita (ADR-003).
+        credential_url:
+          type: string
+          format: uri
+          description: Dónde obtener la llave, con los pasos contados.
+        default_model: { type: string, description: Viene de configuración, nunca de una constante de código. }
+        embedding_dim:
+          type: [integer, 'null']
+          description: Dimensión declarada en la matriz de capacidades; solo para `embeddings`.
+        estimated_cost: { $ref: '#/components/schemas/EstimatedCost' }
+
+    EstimatedCost:
+      type: object
+      description: |
+        Costo estimado por mes de búsqueda activa, mostrado ANTES de pedir la
+        API key (FR-005) y estimado POR SEPARADO para generación y embeddings:
+        sus órdenes de magnitud no se parecen, y sumarlos haría creer que
+        cambiar el proveedor de embeddings mueve la factura.
+      required: [amount_usd, currency, usage_assumption_es]
+      properties:
+        amount_usd: { type: number }
+        currency: { type: string, const: USD }
+        usage_assumption_es:
+          type: string
+          description: Supuesto de uso a la vista, para que la cifra sea interpretable y no un número mágico.
+        free_tier_note_es:
+          type: [string, 'null']
+          description: Qué cabe en la capa gratuita y a partir de qué punto se empieza a pagar.
+
+    ProviderCatalog:
+      type: object
+      description: Lista CERRADA por capacidad; el usuario elige de un desplegable, no escribe un endpoint (FR-009).
+      required: [generation, embeddings]
+      properties:
+        generation:
+          type: array
+          items: { $ref: '#/components/schemas/ProviderOption' }
+        embeddings:
+          type: array
+          items: { $ref: '#/components/schemas/ProviderOption' }
+        separation_reason_es:
+          type: string
+          description: |
+            Por qué se configuran por separado, en una línea para la pantalla:
+            no todos los proveedores ofrecen embeddings, y amarrarlos dejaría el
+            matching semántico inoperante según a quién eligiera el usuario.
+
+    PreflightOutcome:
+      type: object
+      required: [result, checked_at, message]
+      properties:
+        result: { $ref: '#/components/schemas/PreflightResult' }
+        checked_at: { type: string, format: date-time }
+        message:
+          type: string
+          description: |
+            Mensaje accionable en español. NUNCA la llave, NUNCA una traza
+            técnica (FR-007, SC-013).
+        embedding_dim:
+          type: [integer, 'null']
+          description: Dimensión verificada; presente cuando `result` es `verified` en `embeddings` (FR-007.2).
+        affected_features:
+          type: array
+          description: |
+            Funciones concretas afectadas. NO vacío cuando `result` es
+            `capability_unverified`: enumerarlas ANTES de permitir continuar es
+            lo que distingue la degradación explícita de la silenciosa.
+          items: { $ref: '#/components/schemas/AffectedFeature' }
+
+    ProviderConfiguration:
+      type: object
+      required: [capability, provider, model, credential_status, preflight, is_usable]
+      properties:
+        capability: { $ref: '#/components/schemas/Capability' }
+        provider: { type: string }
+        model: { type: string }
+        credential_status: { $ref: '#/components/schemas/CredentialStatus' }
+        preflight: { $ref: '#/components/schemas/PreflightOutcome' }
+        degradation_acknowledged_at:
+          type: [string, 'null']
+          format: date-time
+          description: Acuse específico de la degradación (FR-007.3). Requisito para usar una capacidad `capability_unverified`.
+        is_usable:
+          type: boolean
+          description: |
+            Derivado: `verified`, o `capability_unverified` CON acuse. Es lo que
+            evalúa el gate del onboarding para la capacidad `generation`
+            (FR-010).
+
+    EmailStep:
+      type: object
+      required: [status, disclosure_md, is_skippable]
+      properties:
+        status: { type: string, enum: [pending, linked, skipped] }
+        disclosure_md:
+          type: string
+          description: |
+            Divulgación obligatoria PREVIA a pedir credencial (FR-012): que una
+            App Password da acceso a TODA la bandeja y que leer solo la etiqueta
+            designada es un compromiso de Vokara verificado por sus propias
+            pruebas, no un límite que Google imponga; y que las cuentas de
+            Workspace y de Protección Avanzada no admiten App Passwords.
+        oauth_docs_url: { type: string, format: uri, description: Vía alternativa documentada (ADR-012). }
+        label: { type: [string, 'null'], description: Etiqueta designada. Nunca la App Password. }
+        linked_at: { type: [string, 'null'], format: date-time }
+        credential_status: { $ref: '#/components/schemas/CredentialStatus' }
+        is_skippable:
+          type: boolean
+          const: true
+          description: |
+            Siempre verdadero (FR-011). Omitir tiene el mismo peso visual que
+            continuar y NUNCA bloquea el onboarding.
+        value_if_linked_es: { type: string, description: Qué se gana vinculando. }
+        value_if_skipped_es: { type: string, description: Qué NO se pierde al omitirlo. }
+
+    SetupState:
+      type: object
+      description: |
+        Hechos registrados de la primera ejecución. NUNCA contiene credenciales
+        (FR-008, FR-013). `pending_step` se deriva de estos hechos.
+      required: [disclosure_acknowledged, providers, email_status, is_complete]
+      properties:
+        pending_step:
+          oneOf:
+            - { $ref: '#/components/schemas/SetupStep' }
+            - { type: 'null' }
+          description: '`null` ⇔ la primera ejecución concluyó y no vuelve a mostrarse (FR-015).'
+        disclosure_acknowledged: { type: boolean }
+        disclosure_acknowledged_at: { type: [string, 'null'], format: date-time }
+        providers:
+          type: object
+          description: Configuración por capacidad; `null` en la que no se haya configurado.
+          required: [generation, embeddings]
+          properties:
+            generation:
+              oneOf:
+                - { $ref: '#/components/schemas/ProviderConfiguration' }
+                - { type: 'null' }
+            embeddings:
+              oneOf:
+                - { $ref: '#/components/schemas/ProviderConfiguration' }
+                - { type: 'null' }
+        email_status: { type: string, enum: [pending, linked, skipped] }
+        is_complete:
+          type: boolean
+          description: |
+            Derivado (FR-015): acuse registrado, generación utilizable y paso de
+            correo completado u omitido.
+
+    # ─────────────────────────── onboarding del CV ─────────────────────────
     UploadAccepted:
       type: object
       required: [document_id, parse_job]
@@ -642,7 +964,7 @@ components:
           description: El texto del documento superó el límite de extracción y se truncó (research R-14).
         is_retryable:
           type: boolean
-          description: Verdadero solo si `status` es `failed` (FR-008).
+          description: Verdadero solo si `status` es `failed` (FR-023).
         created_at: { type: string, format: date-time }
         finished_at: { type: [string, 'null'], format: date-time }
 
@@ -652,8 +974,12 @@ components:
 
     OnboardingStep:
       type: string
-      description: Paso derivado del estado, no persistido (research R-18).
-      enum: [consent, upload, processing, processing_failed, objectives, confirm, done]
+      description: |
+        Paso derivado del estado, no persistido (research R-18). `setup`
+        significa que la primera ejecución no ha concluido: el onboarding del CV
+        está bloqueado hasta que haya acuse de divulgación y proveedor de
+        generación utilizable (FR-002, FR-010).
+      enum: [setup, upload, processing, processing_failed, objectives, confirm, done]
 
     Objectives:
       type: object
@@ -688,7 +1014,7 @@ components:
         code:
           type: string
           enum: [NO_ENTRIES, MISSING_TARGET_ROLE, MISSING_LOCATION_OR_REMOTE, MISSING_SALARY_EXPECTATION]
-        message: { type: string, description: Explicación en español de qué falta (FR-024). }
+        message: { type: string, description: Explicación en español de qué falta (FR-039). }
 
     Profile:
       type: object
@@ -714,10 +1040,10 @@ components:
         last_confirmed_at: { type: [string, 'null'], format: date-time }
         has_unconfirmed_changes:
           type: boolean
-          description: Derivado del hash de contenido, no persistido (FR-029, research R-08).
+          description: Derivado del hash de contenido, no persistido (FR-044, research R-08).
         confirmation_blockers:
           type: array
-          description: Vacío ⇔ el perfil puede confirmarse (FR-024).
+          description: Vacío ⇔ el perfil puede confirmarse (FR-039).
           items: { $ref: '#/components/schemas/ConfirmationBlocker' }
 
     EntryType:
@@ -735,16 +1061,16 @@ components:
         id:
           type: string
           format: uuid
-          description: Identificador estable; no cambia por ediciones posteriores (FR-010).
+          description: Identificador estable; no cambia por ediciones posteriores (FR-025).
         entry_type: { $ref: '#/components/schemas/EntryType' }
         origin: { $ref: '#/components/schemas/EntryOrigin' }
         content: { $ref: '#/components/schemas/EntryContent' }
         content_language:
           type: [string, 'null']
-          description: ISO 639-1 del contenido; nunca se traduce (FR-012).
+          description: ISO 639-1 del contenido; nunca se traduce (FR-027).
         is_complete:
           type: boolean
-          description: Calculado por reglas deterministas, no por el modelo (FR-013).
+          description: Calculado por reglas deterministas, no por el modelo (FR-028).
         missing_fields:
           type: array
           items: { type: string }
@@ -906,7 +1232,7 @@ components:
               required: [objectives, entries]
               description: |
                 Contenido íntegro e inmutable en el momento de la confirmación
-                (FR-025, FR-026). Las entradas van embebidas completas, no por
+                (FR-040, FR-041). Las entradas van embebidas completas, no por
                 referencia: la versión debe leerse aunque la entrada se borre
                 después.
               properties:
@@ -918,7 +1244,7 @@ components:
     PendingChanges:
       type: object
       required: [has_changes, added, modified, removed, objectives_changed]
-      description: Diff determinista entre el trabajo en curso y la versión vigente (FR-029).
+      description: Diff determinista entre el trabajo en curso y la versión vigente (FR-044).
       properties:
         has_changes: { type: boolean }
         added:

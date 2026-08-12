@@ -1,0 +1,219 @@
+name: CI
+
+# CI valida, no despliega (roadmap §9). Todos los pasos son bloqueantes.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.3"
+  NODE_VERSION: "20"
+
+jobs:
+  backend:
+    name: Backend — ruff, mypy y pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Instalar dependencias desde el lock
+        run: uv sync --frozen
+
+      - name: ruff (lint)
+        run: uv run ruff check .
+
+      - name: ruff (format)
+        run: uv run ruff format --check .
+
+      - name: mypy --strict
+        run: uv run mypy
+
+      # Integración contra Postgres y Redis reales vía testcontainers (art. VI).
+      - name: pytest (unit, integración y arquitectura)
+        run: uv run pytest tests/unit tests/integration tests/architecture -q
+
+      # Se ejecutan también por separado por lo que verifican: sin
+      # autenticación, dónde escucha la instancia es el único control de
+      # acceso que existe (ADR-008).
+      - name: Los dos tests de binding del ADR-008
+        run: uv run pytest tests/integration/test_local_binding.py -q
+
+      - name: Reversibilidad de la migración
+        run: uv run pytest tests/integration/test_migration_reversibility.py -q
+
+  contract:
+    name: Contrato tipado — el cliente TS no se desincroniza
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: |
+          cd backend && uv sync --frozen
+          cd ../frontend && npm ci
+
+      - name: Regenerar el esquema y el cliente
+        run: |
+          cd backend && uv run python -m app.openapi_export > ../frontend/openapi.json
+          cd ../frontend && npm run generate:api
+
+      # Si alguien cambió un endpoint sin regenerar el cliente, el PR falla
+      # aquí y no en producción (art. I, research R-16).
+      - name: Drift del cliente TypeScript
+        run: git diff --exit-code frontend/openapi.json frontend/src/api/schema.d.ts
+
+  frontend:
+    name: Frontend — vitest y build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias desde el lock
+        run: npm ci
+
+      - name: vitest
+        run: npm run test
+
+      - name: Build de la SPA
+        run: npm run build
+
+  images:
+    name: Build de imágenes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Imagen del backend
+        run: docker build -f infra/docker/backend.Dockerfile -t vokara-backend:ci .
+
+      - name: Imagen del frontend
+        run: docker build -f infra/docker/frontend.Dockerfile -t vokara-frontend:ci .
+
+  clean-install:
+    name: Instalación limpia — clon virgen, sin .env
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # La prueba de que la decisión de un solo .env en la raíz no rompe el
+      # arranque de un clon nuevo: aquí no existe ninguno, y no se crea.
+      - name: Comprobar que no hay ningún .env
+        run: |
+          test ! -f .env || (echo "El runner trae un .env: la prueba no valdría" && exit 1)
+          test ! -f infra/.env || (echo "No debe existir infra/.env" && exit 1)
+
+      # Exactamente el comando documentado en quickstart §1, desde la raíz.
+      - name: docker compose up
+        run: docker compose -f infra/docker-compose.yml up -d --wait --wait-timeout 300
+
+      - name: Los cuatro servicios, ni uno más
+        run: |
+          docker compose -f infra/docker-compose.yml ps
+          services=$(docker compose -f infra/docker-compose.yml ps --services | sort | tr '\n' ' ')
+          test "$services" = "api postgres redis worker " || (echo "Servicios inesperados: $services" && exit 1)
+
+      # El puerto se publica solo en loopback (ADR-008). El test de binding lo
+      # verifica sobre el archivo; esto lo verifica sobre lo que Docker hizo.
+      - name: El puerto publicado es loopback
+        run: |
+          mapping=$(docker compose -f infra/docker-compose.yml port api 8000)
+          echo "api 8000 -> $mapping"
+          case "$mapping" in 127.0.0.1:*) ;; *) echo "Publicado fuera de loopback" && exit 1 ;; esac
+
+      # Las migraciones se aplicaron solas: nadie ejecutó Alembic.
+      - name: GET /api/v1/health responde con la revisión aplicada
+        run: |
+          body=$(curl -sf --retry 10 --retry-delay 3 --retry-all-errors localhost:8000/api/v1/health)
+          echo "$body"
+          echo "$body" | grep -q '"database":"ok"'
+          echo "$body" | grep -q '"migration_revision":"0001"'
+
+      - name: La extensión vector está instalada
+        run: docker compose -f infra/docker-compose.yml exec -T postgres psql -U vokara -d vokara -c "\dx" | grep -q vector
+
+      - name: Logs si algo falló
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --no-color
+
+      - name: Apagar
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v
+
+  licenses:
+    name: Licencias compatibles con AGPL-3.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: |
+          cd backend && uv sync --frozen
+          cd ../frontend && npm ci
+
+      # Herramientas efímeras: verificar licencias no debe engordar el lock
+      # del proyecto (art. VII).
+      #
+      # Se prohíbe por lista negra, no por lista blanca. Vokara es AGPL-3.0
+      # (ADR-010), que puede incorporar MIT, BSD, Apache-2.0, MPL, LGPL y GPL:
+      # la lista blanca sería casi todo el ecosistema y fallaría por variantes
+      # de escritura ("Apache 2.0" vs "Apache-2.0" vs "Apache Software
+      # License"), no por incompatibilidades. Lo que de verdad no puede entrar
+      # es lo propietario, lo no declarado y las licencias con restricciones de
+      # uso, y eso es lo que este paso caza.
+      - name: Licencias del backend
+        run: |
+          cd backend
+          uvx --from pip-licenses pip-licenses --python .venv/bin/python --summary --order=license
+          uvx --from pip-licenses pip-licenses --python .venv/bin/python --partial-match \
+            --fail-on "SSPL;Business Source;BUSL;Commons Clause;Elastic License;Proprietary;UNKNOWN;CC-BY-NC;No License"
+
+      - name: Licencias del frontend
+        run: |
+          cd frontend
+          npx --yes license-checker-rseidelsohn --production --excludePrivatePackages --summary
+          npx --yes license-checker-rseidelsohn --production --excludePrivatePackages \
+            --failOn "UNLICENSED;UNKNOWN;SSPL;BUSL-1.1;Elastic-2.0;CC-BY-NC-4.0"

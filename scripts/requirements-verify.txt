@@ -1,0 +1,18 @@
+# Dependencias SOLO del script de verificación de proveedores (ADR-011).
+# NO son dependencias de Vokara: el backend usa pyproject.toml + uv.lock
+# dentro de Docker.
+#
+# Uso:
+#   python -m venv .venv-verify
+#   source .venv-verify/bin/activate
+#   pip install -r scripts/requirements-verify.txt
+#   python scripts/verify_providers.py
+
+pydantic>=2
+python-dotenv
+langchain-core
+langchain-google-genai
+
+# Descomenta según los proveedores que vayas a verificar:
+# langchain-openai        # OpenAI, y también DeepSeek y Kimi (API compatible)
+# langchain-anthropic     # Anthropic

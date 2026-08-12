@@ -1,0 +1,31 @@
+# El contexto de build es la raiz del repo: fuera todo lo que no entra en la imagen.
+.git/
+.github/
+.venv*
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Configuracion local con credenciales: nunca entra en una imagen (art. V).
+.env
+.env.local
+
+# Datos del usuario: los CVs viven en el volumen, no en la imagen (ADR-007).
+data/
+
+# Documentacion y specs: no las necesita el runtime.
+docs/
+specs/
+.specify/
+
+*:Zone.Identifier
+*Zone.Identifier*
+.DS_Store
+Thumbs.db
