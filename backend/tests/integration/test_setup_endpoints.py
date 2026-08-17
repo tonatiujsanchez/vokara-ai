@@ -75,7 +75,6 @@ def assert_satisfies(body: object, schema_name: str) -> None:
 # ── divulgación (T058) ──────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T058: GET /setup/state todavía no existe")
 def test_state_answers_the_setup_state_schema(setup_client: TestClient) -> None:
     response = setup_client.get(f"{BASE}/state")
 
@@ -83,7 +82,6 @@ def test_state_answers_the_setup_state_schema(setup_client: TestClient) -> None:
     assert_satisfies(response.json(), "SetupState")
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T058: GET /setup/state todavía no existe")
 def test_a_fresh_installation_is_pending_on_the_disclosure(setup_client: TestClient) -> None:
     """Step zero: art. V puts it before any field to fill in (FR-001)."""
     body = setup_client.get(f"{BASE}/state").json()
@@ -93,7 +91,6 @@ def test_a_fresh_installation_is_pending_on_the_disclosure(setup_client: TestCli
     assert body["is_complete"] is False
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T058: GET /setup/disclosure todavía no existe")
 def test_the_disclosure_travels_whole_and_not_as_a_link(setup_client: TestClient) -> None:
     response = setup_client.get(f"{BASE}/disclosure")
 
@@ -104,7 +101,6 @@ def test_the_disclosure_travels_whole_and_not_as_a_link(setup_client: TestClient
     assert body["acknowledged"] is False
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T058: el acuse todavía no se registra")
 def test_the_acknowledgement_is_recorded_and_moves_the_step(setup_client: TestClient) -> None:
     response = setup_client.post(
         f"{BASE}/disclosure-acknowledgement",
@@ -119,7 +115,6 @@ def test_the_acknowledgement_is_recorded_and_moves_the_step(setup_client: TestCl
     assert body["pending_step"] == "providers"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T058: el acuse todavía no se registra")
 def test_acknowledging_twice_is_refused(setup_client: TestClient) -> None:
     payload = {"disclosure_version": CURRENT_DISCLOSURE.version, "acknowledged": True}
     setup_client.post(f"{BASE}/disclosure-acknowledgement", json=payload)
@@ -130,7 +125,6 @@ def test_acknowledging_twice_is_refused(setup_client: TestClient) -> None:
     assert_satisfies(repeated.json(), "Error")
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T058: el acuse todavía no se registra")
 def test_an_unacknowledged_flag_is_refused_by_the_contract(setup_client: TestClient) -> None:
     """`acknowledged` is `const: true`: continuing is not an acknowledgement (FR-002)."""
     response = setup_client.post(
