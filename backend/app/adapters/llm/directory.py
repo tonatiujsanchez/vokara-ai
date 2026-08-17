@@ -22,6 +22,15 @@ from dataclasses import dataclass
 
 from app.adapters.llm.capabilities import ProviderId
 
+# The one line the providers screen shows about why there are two of everything
+# (FR-004, roadmap §11.2). It lives here because it names a provider to make its
+# point, and naming providers is what this layer is for (art. XI).
+SEPARATION_REASON_ES = (
+    "La generación y los embeddings se configuran por separado porque no todos los "
+    "proveedores ofrecen embeddings —Anthropic no los ofrece—, y amarrarlos dejaría tu "
+    "matching semántico inoperante según a quién eligieras."
+)
+
 
 @dataclass(frozen=True)
 class ProviderProfile:
