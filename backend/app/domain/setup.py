@@ -62,6 +62,19 @@ class EmailStepStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class CredentialStatus(StrEnum):
+    """Everything the API may ever say about a credential (FR-008, SC-013).
+
+    Three values and no fourth. Not the key, not the last four characters, not a
+    length: «ni siquiera parcialmente» is the wording of the requirement, and a
+    closed enum is what makes it impossible to answer with anything else.
+    """
+
+    CONFIGURED = "configured"
+    NOT_CONFIGURED = "not_configured"
+    REJECTED = "rejected"
+
+
 # The two preflight results that leave a capability usable (FR-007.2, FR-007.3).
 # Read off the variants instead of repeated as literals, so adding a fifth
 # result cannot silently keep this rule describing the old four.

@@ -112,11 +112,30 @@ def build_embeddings(provider: ProviderId, settings: Settings) -> EmbeddingsPort
     return _google_embeddings(settings, credential_for(provider, Capability.EMBEDDINGS, settings))
 
 
+def default_model(provider: ProviderId, capability: Capability, settings: Settings) -> str:
+    """The model a capability uses when the candidate names none.
+
+    From configuration with an environment override, never a constant in code:
+    Google retired `gemini-2.0-flash` on 1 June 2026, and a provider retiring a
+    model must not break an installation the user has not updated (ADR-011,
+    research R-21).
+    """
+    if provider is not ProviderId.GOOGLE:
+        raise ProviderNotImplementedError(provider, capability)
+
+    match capability:
+        case Capability.GENERATION:
+            return settings.google_model
+        case Capability.EMBEDDINGS:
+            return settings.google_embed
+
+
 def build_probe(
     provider: ProviderId,
     capability: Capability,
     settings: Settings,
     credential: SecretStr | None = None,
+    model: str | None = None,
 ) -> CapabilityProbePort:
     """The preflight probe for one capability of one provider (FR-006).
 
@@ -135,12 +154,17 @@ def build_probe(
     resolved = (
         credential if credential is not None else credential_for(provider, capability, settings)
     )
+    chosen = model or default_model(provider, capability, settings)
 
     match capability:
         case Capability.GENERATION:
-            return _google_generation(settings, resolved)
+            return GoogleStructuredOutput(model=chosen, credential=resolved)
         case Capability.EMBEDDINGS:
-            return _google_embeddings(settings, resolved)
+            return GoogleEmbeddings(
+                model=chosen,
+                dimensions=settings.embedding_dimensions,
+                credential=resolved,
+            )
 
 
 def is_implemented(provider: ProviderId) -> bool:
