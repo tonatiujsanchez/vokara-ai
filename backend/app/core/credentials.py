@@ -73,6 +73,17 @@ class WizardCredential(StrEnum):
     GMAIL_APP_PASSWORD = "VOKARA_GMAIL_APP_PASSWORD"  # noqa: S105 — a name, not a value
 
 
+class WizardSetting(StrEnum):
+    """Not secret, but captured by the wizard and stored in the same file.
+
+    The mail address is the candidate's, so it is theirs and not a value to
+    scatter: it lives beside the App Password it belongs to, out of the
+    database, and it is the one piece of that step the adapter needs to connect.
+    """
+
+    GMAIL_ADDRESS = "VOKARA_GMAIL_ADDRESS"
+
+
 def api_key_of(capability: Capability) -> WizardCredential:
     """The stored name of the API key of one capability.
 
@@ -116,8 +127,18 @@ def read_credential(name: WizardCredential, settings: Settings | None = None) ->
     return SecretStr(value) if value else None
 
 
+def read_setting(name: WizardSetting, settings: Settings | None = None) -> str | None:
+    """A non-secret value the wizard stored, in plain text because it is not one."""
+    return _read_all(settings).get(name.value) or None
+
+
+def write_setting(name: WizardSetting, value: str, settings: Settings | None = None) -> None:
+    """Store a non-secret value the wizard captured, in the same local file."""
+    write_credential(name, SecretStr(value), settings)
+
+
 def write_credential(
-    name: WizardCredential, credential: SecretStr, settings: Settings | None = None
+    name: WizardCredential | WizardSetting, credential: SecretStr, settings: Settings | None = None
 ) -> None:
     """Store a credential, replacing whatever was under that name.
 
@@ -141,7 +162,9 @@ def write_credential(
     _write_private(path, body)
 
 
-def forget_credential(name: WizardCredential, settings: Settings | None = None) -> None:
+def forget_credential(
+    name: WizardCredential | WizardSetting, settings: Settings | None = None
+) -> None:
     """Drop one stored credential, leaving the others in place."""
     path = credentials_path(settings)
     if not path.is_file():
