@@ -107,7 +107,6 @@ def build_port(connection: RecordingImap) -> EmailPort:
     return port
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T055: app/adapters/email/gmail_imap.py no existe")
 def test_no_imap_query_leaves_without_the_designated_label() -> None:
     """The transcript of a successful verification, command by command."""
     connection = RecordingImap()
@@ -122,7 +121,6 @@ def test_no_imap_query_leaves_without_the_designated_label() -> None:
     assert A_LABEL in pattern
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T055: app/adapters/email/gmail_imap.py no existe")
 def test_not_a_single_command_that_could_read_a_message_is_ever_issued() -> None:
     """Checked over a failure too: the unhappy path is where scope leaks."""
     connection = RecordingImap(mailboxes=("Otra etiqueta",))
@@ -135,7 +133,6 @@ def test_not_a_single_command_that_could_read_a_message_is_ever_issued() -> None
     assert not issued & set(FORBIDDEN_COMMANDS)
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T055: app/adapters/email/gmail_imap.py no existe")
 def test_a_label_with_a_wildcard_is_refused_instead_of_sent() -> None:
     """`*` in an IMAP pattern matches every mailbox: that is the scope escape."""
     connection = RecordingImap()
@@ -148,7 +145,6 @@ def test_a_label_with_a_wildcard_is_refused_instead_of_sent() -> None:
     assert "list" not in [name for name, _, _ in connection.commands]
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T055: app/adapters/email/gmail_imap.py no existe")
 def test_the_module_contains_no_call_that_could_read_mail() -> None:
     """The structural half: what the module *can* do, not just what it did."""
     tree = ast.parse(ADAPTER_SOURCE.read_text(encoding="utf-8"), filename=str(ADAPTER_SOURCE))
@@ -165,7 +161,6 @@ def test_the_module_contains_no_call_that_could_read_mail() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T055: app/adapters/email/gmail_imap.py no existe")
 def test_the_port_exposes_no_way_to_read_anything() -> None:
     """A method that cannot exist cannot be called by mistake later."""
     module = importlib.import_module(ADAPTER_MODULE)
