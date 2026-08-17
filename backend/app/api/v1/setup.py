@@ -26,8 +26,9 @@ from pydantic import BaseModel, Field, SecretStr
 from app.api.deps import CandidateId
 from app.domain.capability import Capability
 from app.domain.setup import CredentialStatus, EmailStepStatus, SetupStep
-from app.services import setup_service
+from app.services import preflight_service, provider_catalog_service, setup_service
 from app.services.preflight_service import ProviderConfigurationView
+from app.services.provider_catalog_service import ProviderOptionView
 from app.services.setup_service import SetupStateView
 
 router = APIRouter(prefix="/setup", tags=["setup"])
@@ -87,6 +88,45 @@ class ProviderConfigurationModel(BaseModel):
             "definida en el entorno y Vokara usará la del asistente."
         ),
     )
+
+
+class EstimatedCostModel(BaseModel):
+    """Cost per month of active search, shown before the key is asked for."""
+
+    amount_usd: float | None = Field(
+        default=None, description="`null` mientras el cálculo esté pendiente."
+    )
+    currency: Literal["USD"] = "USD"
+    usage_assumption_es: str | None = Field(
+        default=None,
+        description="El supuesto de uso que produce la cifra, para que sea interpretable.",
+    )
+    has_free_tier: bool | None = None
+    free_tier_note_es: str | None = None
+    is_estimated: bool = Field(
+        description="Falso mientras no haya cifra: la ausencia se dice, no se inventa."
+    )
+    pending_note_es: str | None = None
+
+
+class ProviderOptionModel(BaseModel):
+    """One offerable option. Only appears if its verification is on record."""
+
+    provider: str
+    display_name: str
+    is_suggested_default: bool
+    credential_url: str = Field(description="Dónde se obtiene la llave.")
+    default_model: str = Field(description="De configuración, nunca de una constante.")
+    embedding_dim: int | None = None
+    estimated_cost: EstimatedCostModel
+
+
+class ProviderCatalogModel(BaseModel):
+    """Two closed lists, because they are two independent choices (ADR-011)."""
+
+    generation: list[ProviderOptionModel]
+    embeddings: list[ProviderOptionModel]
+    separation_reason_es: str
 
 
 class DisclosureModel(BaseModel):
@@ -173,6 +213,26 @@ def _configuration_model(
     )
 
 
+def _option_model(option: ProviderOptionView) -> ProviderOptionModel:
+    cost = option.estimated_cost
+    return ProviderOptionModel(
+        provider=option.provider,
+        display_name=option.display_name,
+        is_suggested_default=option.is_suggested_default,
+        credential_url=option.credential_url,
+        default_model=option.default_model,
+        embedding_dim=option.embedding_dim,
+        estimated_cost=EstimatedCostModel(
+            amount_usd=float(cost.amount_usd) if cost.amount_usd is not None else None,
+            usage_assumption_es=cost.usage_assumption_es,
+            has_free_tier=cost.has_free_tier,
+            free_tier_note_es=cost.free_tier_note_es,
+            is_estimated=cost.is_estimated,
+            pending_note_es=cost.pending_note_es,
+        ),
+    )
+
+
 def _state_model(view: SetupStateView) -> SetupStateModel:
     return SetupStateModel(
         pending_step=view.pending_step,
@@ -230,3 +290,86 @@ def post_disclosure_acknowledgement(
     return _state_model(
         setup_service.acknowledge_disclosure(candidate_id, version=payload.disclosure_version)
     )
+
+
+# ── proveedores y preflight (FR-004 a FR-010) ───────────────────────────────
+
+
+@router.get(
+    "/providers/catalog",
+    response_model=ProviderCatalogModel,
+    summary="Proveedores ofrecibles por capacidad, con su costo estimado",
+)
+def get_provider_catalog() -> ProviderCatalogModel:
+    """The closed list, already resolved: the frontend renders, it does not branch.
+
+    The cost travels here so it can be shown **before** any key is asked for
+    (FR-005), estimated separately for each capability.
+    """
+    view = provider_catalog_service.catalogue()
+    return ProviderCatalogModel(
+        generation=[_option_model(option) for option in view.generation],
+        embeddings=[_option_model(option) for option in view.embeddings],
+        separation_reason_es=view.separation_reason_es,
+    )
+
+
+@router.get(
+    "/providers/{capability}",
+    response_model=ProviderConfigurationModel | None,
+    summary="Configuración vigente de una capacidad",
+)
+def get_provider_configuration(
+    candidate_id: CandidateId, capability: Capability
+) -> ProviderConfigurationModel | None:
+    """`null` when nothing is configured. Never the credential (FR-008)."""
+    return _configuration_model(preflight_service.current_configuration(candidate_id, capability))
+
+
+@router.put(
+    "/providers/{capability}",
+    response_model=ProviderConfigurationModel,
+    summary="Configura una capacidad y ejecuta su preflight",
+)
+def put_provider_configuration(
+    candidate_id: CandidateId, capability: Capability, payload: ProviderCredentialRequest
+) -> ProviderConfigurationModel:
+    """The preflight runs **here**, at save time, never deferred (FR-006).
+
+    The three results that do not allow progress leave through the error
+    catalogue with their own status and code, because they are three different
+    situations and the frontend has to be able to tell them apart without
+    reading prose (contracts/errors.md).
+    """
+    view = preflight_service.configure_capability(
+        candidate_id,
+        capability,
+        provider=payload.provider,
+        api_key=payload.api_key,
+        model=payload.model,
+    )
+    configured = _configuration_model(view)
+    assert configured is not None  # noqa: S101 — configure_capability never returns None
+    return configured
+
+
+@router.post(
+    "/providers/{capability}/degradation-acknowledgement",
+    response_model=ProviderConfigurationModel,
+    status_code=status.HTTP_201_CREATED,
+    summary="Acuse específico de una degradación explícita",
+)
+def post_degradation_acknowledgement(
+    candidate_id: CandidateId, capability: Capability
+) -> ProviderConfigurationModel:
+    """The only way a capability without guarantee becomes usable (FR-007.3).
+
+    Answered 409 when the current preflight is not `capability_unverified`:
+    there is no degradation to acknowledge, and recording one would be a
+    consent to nothing.
+    """
+    acknowledged = _configuration_model(
+        preflight_service.acknowledge_degradation(candidate_id, capability)
+    )
+    assert acknowledged is not None  # noqa: S101 — the service raises rather than return None
+    return acknowledged

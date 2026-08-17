@@ -138,7 +138,6 @@ def test_an_unacknowledged_flag_is_refused_by_the_contract(setup_client: TestCli
 # ── proveedores (T059) ──────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: el catálogo todavía no se expone")
 def test_the_catalogue_answers_its_schema_for_both_capabilities(
     setup_client: TestClient,
 ) -> None:
@@ -153,7 +152,6 @@ def test_the_catalogue_answers_its_schema_for_both_capabilities(
             assert_satisfies(option, "ProviderOption")
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: el catálogo todavía no se expone")
 def test_the_cost_is_on_screen_before_any_key_is_asked_for(setup_client: TestClient) -> None:
     """FR-005: the figure travels with the option, not after the form."""
     body = setup_client.get(f"{BASE}/providers/catalog").json()
@@ -163,7 +161,6 @@ def test_the_cost_is_on_screen_before_any_key_is_asked_for(setup_client: TestCli
         assert option["estimated_cost"]["currency"] == "USD"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: PUT /setup/providers todavía no existe")
 def test_an_unconfigured_capability_answers_null(setup_client: TestClient) -> None:
     response = setup_client.get(f"{BASE}/providers/generation")
 
@@ -171,7 +168,6 @@ def test_an_unconfigured_capability_answers_null(setup_client: TestClient) -> No
     assert response.json() is None
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: PUT /setup/providers todavía no existe")
 def test_saving_a_working_key_verifies_the_capability(
     setup_client: TestClient, probes: ProbeDirector, offerable_provider: str
 ) -> None:
@@ -188,7 +184,6 @@ def test_saving_a_working_key_verifies_the_capability(
     assert body["is_usable"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: PUT /setup/providers todavía no existe")
 def test_the_response_never_carries_the_key_that_was_sent(
     setup_client: TestClient, probes: ProbeDirector, offerable_provider: str
 ) -> None:
@@ -204,7 +199,6 @@ def test_the_response_never_carries_the_key_that_was_sent(
         assert A_VALID_KEY[:length] not in response.text
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: PUT /setup/providers todavía no existe")
 @pytest.mark.parametrize(
     ("attempt", "status", "code"),
     [
@@ -237,7 +231,6 @@ def test_each_failing_result_has_its_own_status_and_code(
     assert_satisfies(response.json(), "Error")
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: PUT /setup/providers todavía no existe")
 def test_a_provider_outside_the_closed_list_is_not_configurable(
     setup_client: TestClient,
 ) -> None:
@@ -251,7 +244,6 @@ def test_a_provider_outside_the_closed_list_is_not_configurable(
     assert response.json()["code"] == "PROVIDER_NOT_OFFERED"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: el acuse de degradación no existe")
 def test_a_degraded_capability_needs_its_acknowledgement_to_become_usable(
     setup_client: TestClient, probes: ProbeDirector, offerable_provider: str
 ) -> None:
@@ -276,7 +268,6 @@ def test_a_degraded_capability_needs_its_acknowledgement_to_become_usable(
     assert acknowledged.json()["is_usable"] is True
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T059: el acuse de degradación no existe")
 def test_there_is_nothing_to_acknowledge_on_a_verified_capability(
     setup_client: TestClient, probes: ProbeDirector, configure: ConfigureCapability
 ) -> None:
