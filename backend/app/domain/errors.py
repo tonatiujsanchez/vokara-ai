@@ -55,6 +55,20 @@ class DisclosureAcknowledgementRequiredError(DomainError):
     http_status = 409
 
 
+class DisclosureAlreadyAcknowledgedError(DomainError):
+    """The 409 of `POST /setup/disclosure-acknowledgement`.
+
+    Not in the catalogue of contracts/errors.md, which declares the status
+    without a code; the code is added here because the contract's rule is that
+    every error body carries one. Refusing rather than recording a second
+    acknowledgement keeps the record a history of what actually happened.
+    """
+
+    code = "DISCLOSURE_ALREADY_ACKNOWLEDGED"
+    message = "Ya aceptaste esta versión de la divulgación. Puedes continuar con la configuración."
+    http_status = 409
+
+
 # ── Primera ejecución: proveedores y preflight (FR-004 a FR-010) ────────────
 #
 # Four results, four messages, because they are four situations. Presenting an

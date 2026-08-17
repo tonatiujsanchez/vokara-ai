@@ -21,6 +21,7 @@ from app.domain.capability import Capability, affected_features
 from app.domain.errors import (
     DegradationAcknowledgementRequiredError,
     DisclosureAcknowledgementRequiredError,
+    DisclosureAlreadyAcknowledgedError,
     DomainError,
     EmailAppPasswordRejectedError,
     EmailLabelNotFoundError,
@@ -37,6 +38,7 @@ A_KEY = "AIzaSyD-una-llave-real-tendria-esta-forma-39-chars"
 
 FIRST_RUN_ERRORS: tuple[DomainError, ...] = (
     DisclosureAcknowledgementRequiredError(),
+    DisclosureAlreadyAcknowledgedError(),
     ProviderCredentialRejectedError(console_url="https://ejemplo.invalid/consola"),
     ProviderQuotaExceededError(),
     ProviderUnreachableError(),
@@ -133,6 +135,7 @@ def test_every_message_says_what_to_do_next(error: DomainError) -> None:
 def test_the_http_status_matches_the_catalogue(error: DomainError) -> None:
     expected = {
         "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED": 409,
+        "DISCLOSURE_ALREADY_ACKNOWLEDGED": 409,
         "PROVIDER_CREDENTIAL_REJECTED": 400,
         "PROVIDER_QUOTA_EXCEEDED": 429,
         "PROVIDER_UNREACHABLE": 503,
