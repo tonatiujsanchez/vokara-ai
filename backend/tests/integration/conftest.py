@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
+from sqlalchemy import Engine, text
 
 from app.adapters.email.base import EmailFailure, EmailPort, EmailPortError
 from app.adapters.llm.capabilities import ProviderId
@@ -126,13 +127,29 @@ def mailbox(monkeypatch: pytest.MonkeyPatch) -> MailboxDirector:
     return director
 
 
+def _forget_the_first_run(engine: Engine) -> None:
+    """Erase the first run between tests.
+
+    These tests go through HTTP, so the code under test opens its own
+    transactions and commits them: the rollback of `db_session` cannot reach
+    them. Wiping the two tables the wizard writes is what keeps each test
+    starting from a fresh installation, which is the state most of them are
+    about.
+    """
+    with engine.begin() as connection:
+        connection.execute(text("delete from provider_configurations"))
+        connection.execute(text("delete from setup_state"))
+
+
 @pytest.fixture
-def setup_client(migrated_database: str, data_dir: Path) -> Iterator[TestClient]:
+def setup_client(migrated_database: str, data_dir: Path, db_engine: Engine) -> Iterator[TestClient]:
     """The API against the throwaway database and the throwaway data directory."""
     get_engine.cache_clear()
     get_session_factory.cache_clear()
+    _forget_the_first_run(db_engine)
     with TestClient(app) as client:
         yield client
+    _forget_the_first_run(db_engine)
     get_engine.cache_clear()
     get_session_factory.cache_clear()
 

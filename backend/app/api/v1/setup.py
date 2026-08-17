@@ -26,7 +26,13 @@ from pydantic import BaseModel, Field, SecretStr
 from app.api.deps import CandidateId
 from app.domain.capability import Capability
 from app.domain.setup import CredentialStatus, EmailStepStatus, SetupStep
-from app.services import preflight_service, provider_catalog_service, setup_service
+from app.services import (
+    email_link_service,
+    preflight_service,
+    provider_catalog_service,
+    setup_service,
+)
+from app.services.email_link_service import EmailStepView
 from app.services.preflight_service import ProviderConfigurationView
 from app.services.provider_catalog_service import ProviderOptionView
 from app.services.setup_service import SetupStateView
@@ -129,6 +135,34 @@ class ProviderCatalogModel(BaseModel):
     separation_reason_es: str
 
 
+class EmailStepModel(BaseModel):
+    """The optional step, with everything needed to decide (FR-011, FR-012)."""
+
+    status: EmailStepStatus
+    disclosure_md: str = Field(
+        description="Divulgación obligatoria PREVIA a pedir credencial alguna (FR-012)."
+    )
+    oauth_docs_url: str = Field(description="Vía alternativa para cuentas sin App Passwords.")
+    label: str | None = Field(default=None, description="Etiqueta designada. Nunca la credencial.")
+    linked_at: datetime | None = None
+    credential_status: CredentialStatus
+    is_skippable: Literal[True] = Field(
+        default=True,
+        description="Siempre verdadero (FR-011): omitir tiene el mismo peso que continuar.",
+    )
+    value_if_linked_es: str = Field(description="Qué se gana vinculando.")
+    value_if_skipped_es: str = Field(description="Qué NO se pierde al omitirlo.")
+    configuration_notice_es: str | None = None
+
+
+class EmailLinkRequest(BaseModel):
+    """The App Password travels in the body, is used once and never returned."""
+
+    email_address: str
+    app_password: SecretStr = Field(description="Write-only; jamás se devuelve.")
+    label: str = Field(description="Etiqueta de Gmail a la que Vokara restringe cada consulta.")
+
+
 class DisclosureModel(BaseModel):
     """The full text of the disclosure of art. V, to be shown on screen."""
 
@@ -209,6 +243,20 @@ def _configuration_model(
         ),
         degradation_acknowledged_at=view.degradation_acknowledged_at,
         is_usable=view.is_usable,
+        configuration_notice_es=view.configuration_notice_es,
+    )
+
+
+def _email_model(view: EmailStepView) -> EmailStepModel:
+    return EmailStepModel(
+        status=view.status,
+        disclosure_md=view.disclosure_md,
+        oauth_docs_url=view.oauth_docs_url,
+        label=view.label,
+        linked_at=view.linked_at,
+        credential_status=view.credential_status,
+        value_if_linked_es=view.value_if_linked_es,
+        value_if_skipped_es=view.value_if_skipped_es,
         configuration_notice_es=view.configuration_notice_es,
     )
 
@@ -373,3 +421,43 @@ def post_degradation_acknowledgement(
     )
     assert acknowledged is not None  # noqa: S101 — the service raises rather than return None
     return acknowledged
+
+
+# ── correo, paso opcional (FR-011 a FR-013) ─────────────────────────────────
+
+
+@router.get("/email", response_model=EmailStepModel, summary="Estado del paso de correo")
+def get_email_step(candidate_id: CandidateId) -> EmailStepModel:
+    """Carries the disclosure with it, because FR-012 requires it **before**.
+
+    A warning that arrives after the form has been filled in is not a warning.
+    """
+    return _email_model(email_link_service.read_step(candidate_id))
+
+
+@router.post(
+    "/email/link",
+    response_model=EmailStepModel,
+    summary="Vincula la cuenta de correo y verifica la etiqueta designada",
+)
+def post_email_link(candidate_id: CandidateId, payload: EmailLinkRequest) -> EmailStepModel:
+    """Verifies the label exists before taking the link as established (FR-013).
+
+    Its three failures leave with their own code and none of them blocks
+    anything: the step stays skippable at every point.
+    """
+    return _email_model(
+        email_link_service.link(
+            candidate_id,
+            address=payload.email_address,
+            app_password=payload.app_password,
+            label=payload.label,
+        )
+    )
+
+
+@router.post("/email/skip", response_model=SetupStateModel, summary="Omite el paso de correo")
+def post_email_skip(candidate_id: CandidateId) -> SetupStateModel:
+    """One action, and the first run can conclude. A valid ending (FR-011)."""
+    email_link_service.skip(candidate_id)
+    return _state_model(setup_service.read_state(candidate_id))

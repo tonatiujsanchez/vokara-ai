@@ -281,7 +281,6 @@ def test_there_is_nothing_to_acknowledge_on_a_verified_capability(
 # ── correo (T060) ───────────────────────────────────────────────────────────
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T060: GET /setup/email todavía no existe")
 def test_the_email_step_answers_its_schema_with_the_disclosure_in_it(
     setup_client: TestClient,
 ) -> None:
@@ -294,7 +293,6 @@ def test_the_email_step_answers_its_schema_with_the_disclosure_in_it(
     assert body["status"] == "pending"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T060: GET /setup/email todavía no existe")
 def test_the_step_says_what_is_gained_and_what_is_not_lost(setup_client: TestClient) -> None:
     """FR-011: a decision needs both halves of the sentence."""
     body = setup_client.get(f"{BASE}/email").json()
@@ -304,7 +302,6 @@ def test_the_step_says_what_is_gained_and_what_is_not_lost(setup_client: TestCli
     assert body["oauth_docs_url"]
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T060: POST /setup/email/link todavía no existe")
 def test_linking_verifies_the_label_before_believing_it(
     setup_client: TestClient, mailbox: MailboxDirector
 ) -> None:
@@ -324,7 +321,6 @@ def test_linking_verifies_the_label_before_believing_it(
     assert body["label"] == "Alertas de empleo"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T060: POST /setup/email/link todavía no existe")
 def test_a_label_that_does_not_exist_leaves_the_step_pending(
     setup_client: TestClient, mailbox: MailboxDirector
 ) -> None:
@@ -342,7 +338,6 @@ def test_a_label_that_does_not_exist_leaves_the_step_pending(
     assert setup_client.get(f"{BASE}/email").json()["status"] == "pending"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T060: POST /setup/email/skip todavía no existe")
 def test_skipping_is_one_action_and_ends_the_step(setup_client: TestClient) -> None:
     response = setup_client.post(f"{BASE}/email/skip")
 
@@ -351,7 +346,6 @@ def test_skipping_is_one_action_and_ends_the_step(setup_client: TestClient) -> N
     assert response.json()["email_status"] == "skipped"
 
 
-@pytest.mark.xfail(strict=True, reason="verde en T060: POST /setup/email/link todavía no existe")
 def test_no_response_of_the_email_step_carries_the_app_password(
     setup_client: TestClient, mailbox: MailboxDirector
 ) -> None:
