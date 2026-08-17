@@ -127,7 +127,7 @@ def link(
     app_password: SecretStr,
     label: str,
     settings: Settings | None = None,
-    port_factory: PortFactory = _build_port,
+    port_factory: PortFactory | None = None,
 ) -> EmailStepView:
     """Verify the designated label exists, and only then call it linked (FR-013).
 
@@ -141,8 +141,11 @@ def link(
     write_setting(WizardSetting.GMAIL_ADDRESS, address, resolved)
     write_credential(WizardCredential.GMAIL_APP_PASSWORD, app_password, resolved)
 
+    # Resolved here rather than as a default argument, so replacing
+    # `_build_port` in this module reaches the call made through an endpoint.
+    factory: PortFactory = port_factory or _build_port
     try:
-        port_factory(address, app_password).verify_label(label)
+        factory(address, app_password).verify_label(label)
     except EmailPortError as error:
         raise _translated(error) from None
 

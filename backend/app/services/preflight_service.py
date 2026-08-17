@@ -223,7 +223,7 @@ def configure_capability(
     api_key: SecretStr,
     model: str | None = None,
     settings: Settings | None = None,
-    probe_factory: ProbeFactory = build_probe,
+    probe_factory: ProbeFactory | None = None,
 ) -> ProviderConfigurationView:
     """Store the credential, probe the capability with it, record what happened.
 
@@ -240,7 +240,10 @@ def configure_capability(
     # be retriable without asking for the key again (edge case of the spec).
     write_credential(api_key_of(capability), api_key, resolved)
 
-    probe = probe_factory(chosen, capability, resolved, credential=api_key, model=model_name)
+    # Resolved here and not as a default argument so a test can replace
+    # `build_probe` in this module and have the endpoints see the double too.
+    factory: ProbeFactory = probe_factory or build_probe
+    probe = factory(chosen, capability, resolved, credential=api_key, model=model_name)
     attempt = _probe_now(probe, model_name)
     digest = fingerprint(api_key, resolved)
 
