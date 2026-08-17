@@ -20,10 +20,13 @@ rule exists for (ADR-011).
 
 from __future__ import annotations
 
+from pydantic import SecretStr
+
 from app.adapters.llm.base import CapabilityProbePort, EmbeddingsPort, StructuredOutputPort
 from app.adapters.llm.capabilities import ProviderId, offerable_for
 from app.adapters.llm.google import GoogleEmbeddings, GoogleStructuredOutput
 from app.core.config import Settings
+from app.core.credentials import api_key_of, read_credential
 from app.domain.capability import Capability
 
 
@@ -41,18 +44,57 @@ class ProviderNotImplementedError(LookupError):
         self.capability = capability
 
 
-def _google_generation(settings: Settings) -> GoogleStructuredOutput:
-    return GoogleStructuredOutput(
-        model=settings.google_model,
-        credential=settings.google_api_key,
-    )
+def environment_credential(provider: ProviderId, settings: Settings) -> SecretStr | None:
+    """The credential of a provider as it comes from the environment or `.env`.
+
+    Exposed because a service needs to know whether the key it just stored is
+    *also* defined out there, in order to say so instead of resolving the clash
+    in silence (art. XI). It hands back the value rather than a boolean so the
+    caller can compare, and it is the one function of this module that reads a
+    provider-shaped setting on someone else's behalf.
+    """
+    if provider is ProviderId.GOOGLE:
+        return settings.google_api_key
+    return None
 
 
-def _google_embeddings(settings: Settings) -> GoogleEmbeddings:
+def environment_credential_name(provider: ProviderId) -> str | None:
+    """The variable a user would grep for, so the message can name it.
+
+    Here and not in the service for the usual reason: the name of the variable
+    carries the name of the provider (art. XI, ADR-011).
+    """
+    if provider is ProviderId.GOOGLE:
+        return "GOOGLE_API_KEY"
+    return None
+
+
+def credential_for(
+    provider: ProviderId, capability: Capability, settings: Settings
+) -> SecretStr | None:
+    """The credential a call will actually use, with the wizard's one first.
+
+    The inversion of the general precedence lives here and is argued in
+    `core/credentials.py`: what the candidate configured on screen is what
+    Vokara uses, and the environment is the fallback for whoever prefers files.
+    Reading it fresh on every build is what lets a rotation be noticed at all
+    (research R-24).
+    """
+    stored = read_credential(api_key_of(capability), settings)
+    if stored is not None:
+        return stored
+    return environment_credential(provider, settings)
+
+
+def _google_generation(settings: Settings, credential: SecretStr | None) -> GoogleStructuredOutput:
+    return GoogleStructuredOutput(model=settings.google_model, credential=credential)
+
+
+def _google_embeddings(settings: Settings, credential: SecretStr | None) -> GoogleEmbeddings:
     return GoogleEmbeddings(
         model=settings.google_embed,
         dimensions=settings.embedding_dimensions,
-        credential=settings.google_api_key,
+        credential=credential,
     )
 
 
@@ -60,33 +102,45 @@ def build_structured_output(provider: ProviderId, settings: Settings) -> Structu
     """The generation port of a provider, with its own credential and model."""
     if provider is not ProviderId.GOOGLE:
         raise ProviderNotImplementedError(provider, Capability.GENERATION)
-    return _google_generation(settings)
+    return _google_generation(settings, credential_for(provider, Capability.GENERATION, settings))
 
 
 def build_embeddings(provider: ProviderId, settings: Settings) -> EmbeddingsPort:
     """The embeddings port, configured independently of generation (FR-004)."""
     if provider is not ProviderId.GOOGLE:
         raise ProviderNotImplementedError(provider, Capability.EMBEDDINGS)
-    return _google_embeddings(settings)
+    return _google_embeddings(settings, credential_for(provider, Capability.EMBEDDINGS, settings))
 
 
 def build_probe(
-    provider: ProviderId, capability: Capability, settings: Settings
+    provider: ProviderId,
+    capability: Capability,
+    settings: Settings,
+    credential: SecretStr | None = None,
 ) -> CapabilityProbePort:
     """The preflight probe for one capability of one provider (FR-006).
 
     It returns the same object that will serve the capability afterwards, so
     what gets verified is what gets used: verifying one client and then calling
     a differently configured one would make the preflight a formality.
+
+    `credential` is the key the candidate has just pasted. It is passed
+    explicitly rather than read back from configuration so that what the
+    preflight measures is that key, unambiguously, on the one call where the two
+    could still differ.
     """
     if provider is not ProviderId.GOOGLE:
         raise ProviderNotImplementedError(provider, capability)
 
+    resolved = (
+        credential if credential is not None else credential_for(provider, capability, settings)
+    )
+
     match capability:
         case Capability.GENERATION:
-            return _google_generation(settings)
+            return _google_generation(settings, resolved)
         case Capability.EMBEDDINGS:
-            return _google_embeddings(settings)
+            return _google_embeddings(settings, resolved)
 
 
 def is_implemented(provider: ProviderId) -> bool:

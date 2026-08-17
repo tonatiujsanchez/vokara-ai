@@ -28,6 +28,55 @@ class Capability(StrEnum):
     GENERATION = "generation"
     EMBEDDINGS = "embeddings"
 
+    @property
+    def label_es(self) -> str:
+        """How the capability is named on screen, in Spanish (art. IX)."""
+        match self:
+            case Capability.GENERATION:
+                return "la salida estructurada"
+            case Capability.EMBEDDINGS:
+                return "los embeddings"
+
+
+@dataclass(frozen=True)
+class AffectedFeature:
+    """A concrete function lost to a degradation, with its stable code (SC-016).
+
+    Concrete, and never a generic warning: «algo podría no funcionar» is not
+    informed degradation, it is a shrug. The candidate is being asked to accept
+    a loss, so the loss is named before they can accept it (FR-007.3, art. XI).
+    """
+
+    code: str
+    message_es: str
+
+
+CV_PARSING = AffectedFeature(
+    code="CV_PARSING",
+    message_es="Sembrar tu perfil desde el CV puede fallar o traer datos incompletos.",
+)
+
+SEMANTIC_MATCHING = AffectedFeature(
+    code="SEMANTIC_MATCHING",
+    message_es=(
+        "El matching semántico quedaría desactivado. El matching por reglas sigue funcionando."
+    ),
+)
+
+
+def affected_features(capability: Capability) -> tuple[AffectedFeature, ...]:
+    """Which product functions depend on the capability that came back unverified.
+
+    This mapping is domain knowledge and not adapter knowledge: what breaks when
+    embeddings are unavailable is a fact about Vokara, not about whoever failed
+    to provide them (contracts/errors.md).
+    """
+    match capability:
+        case Capability.GENERATION:
+            return (CV_PARSING,)
+        case Capability.EMBEDDINGS:
+            return (SEMANTIC_MATCHING,)
+
 
 @dataclass(frozen=True)
 class Verified:
