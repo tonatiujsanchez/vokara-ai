@@ -31,6 +31,18 @@ Como el comando documentado es `docker compose -f infra/docker-compose.yml up`, 
 
 Al añadir una variable nueva, actualizar el `.env.example` **de la raíz** en el mismo commit: es la única forma de que la otra máquina se entere (ADR-000).
 
+### Dónde escribe el wizard las credenciales, y por qué gana él
+
+El `.env` de la raíz es tuyo y lo editas a mano. Las credenciales que **pegas en el asistente de primera ejecución** —la API key de cada capacidad y la App Password del correo— no caben ahí: el comando documentado no monta ningún archivo del repositorio dentro de los contenedores (Compose lee `../.env` y **inyecta su contenido como variables de entorno**), así que el proceso que tendría que escribirlo no lo alcanza. Se escriben en **`<VOKARA_DATA_DIR>/credentials.env`**, con permisos `0600`, dentro del volumen de datos que ya persiste (implementado en `backend/app/core/credentials.py`, T050).
+
+**Ese archivo tiene prioridad sobre el `.env` y sobre las variables de entorno, y solo para esas credenciales.** Es la regla inversa a la del resto de la configuración, y la excepción es deliberada: el asistente es la acción más reciente y explícita del usuario. Si ganara el `.env`, alguien podría pegar una llave nueva, ver el preflight en verde y que Vokara siguiera llamando al proveedor con la vieja, **sin ningún error visible** — el mismo tipo de resultado que miente que la research R-24 existe para evitar, y lo contrario del control que promete el art. X.
+
+- **Cuando las dos existen, la aplicación lo dice.** Al guardar desde el asistente, si la misma variable también está definida en tu entorno o en tu `.env`, la respuesta trae un aviso explícito («esta credencial también está definida en tu `.env`; Vokara usará la que acabas de configurar»). Informar en vez de resolver en silencio es lo que exige el art. XI.
+- **La excepción termina en esas credenciales.** Los nombres de modelo, los umbrales y `VOKARA_DATA_DIR` conservan la precedencia **entorno > `.env` > defaults** del ADR-011 y de `Settings`, de modo que sobreescribir por entorno en CI o en un contenedor sigue funcionando.
+- **Para volver a lo que diga tu `.env`**, borra `credentials.env` (o la línea que te sobre) y reinicia. El preflight de esa capacidad queda invalidado y el asistente la vuelve a pedir.
+
+Queda escrito aquí y en el propio `backend/app/core/config.py`: dos precedencias distintas en el mismo sistema es exactamente lo que se olvida y produce bugs seis meses después.
+
 ---
 
 ## 1. Levantar el entorno

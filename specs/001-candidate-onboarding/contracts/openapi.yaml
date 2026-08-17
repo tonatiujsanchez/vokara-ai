@@ -784,16 +784,31 @@ components:
         API key (FR-005) y estimado POR SEPARADO para generación y embeddings:
         sus órdenes de magnitud no se parecen, y sumarlos haría creer que
         cambiar el proveedor de embeddings mueve la factura.
-      required: [amount_usd, currency, usage_assumption_es]
+      required: [currency, is_estimated]
       properties:
-        amount_usd: { type: number }
+        amount_usd:
+          type: [number, 'null']
+          description: |
+            `null` mientras el cálculo del paso 10 del roadmap esté pendiente
+            (research R-27). La ausencia se dice —ver `pending_note_es`—, NUNCA
+            se rellena con una cifra plausible: es la misma regla del art. IV
+            aplicada a lo que Vokara dice de sí mismo.
         currency: { type: string, const: USD }
         usage_assumption_es:
-          type: string
+          type: [string, 'null']
           description: Supuesto de uso a la vista, para que la cifra sea interpretable y no un número mágico.
+        has_free_tier:
+          type: [boolean, 'null']
+          description: Si el proveedor tiene capa gratuita. Es un hecho del proveedor y se conoce ya.
         free_tier_note_es:
           type: [string, 'null']
           description: Qué cabe en la capa gratuita y a partir de qué punto se empieza a pagar.
+        is_estimated:
+          type: boolean
+          description: Falso mientras no haya cifra publicada para esa opción.
+        pending_note_es:
+          type: [string, 'null']
+          description: Qué mostrar en lugar de la cifra mientras `is_estimated` sea falso.
 
     ProviderCatalog:
       type: object
@@ -854,6 +869,14 @@ components:
             Derivado: `verified`, o `capability_unverified` CON acuse. Es lo que
             evalúa el gate del onboarding para la capacidad `generation`
             (FR-010).
+        configuration_notice_es:
+          type: [string, 'null']
+          description: |
+            Aviso de configuración, NUNCA una credencial. Se emite cuando la
+            misma credencial también está definida en el entorno o en el `.env`:
+            gana la que el asistente acaba de guardar, y decirlo es lo que
+            impide resolver el conflicto en silencio (art. XI). Añadido al
+            implementar T050/T059.
 
     EmailStep:
       type: object
@@ -880,6 +903,11 @@ components:
             continuar y NUNCA bloquea el onboarding.
         value_if_linked_es: { type: string, description: Qué se gana vinculando. }
         value_if_skipped_es: { type: string, description: Qué NO se pierde al omitirlo. }
+        configuration_notice_es:
+          type: [string, 'null']
+          description: |
+            Mismo aviso que en `ProviderConfiguration`, para la App Password:
+            si también está en el entorno, gana la del asistente y se dice.
 
     SetupState:
       type: object
