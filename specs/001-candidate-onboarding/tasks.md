@@ -41,6 +41,13 @@ El trabajo va en **tres bloques con checkpoint verificable entre ellos**. **Ning
 4. **Ninguna tarea es más grande de lo que se revisa de una sentada.** Cuando un artefacto grande (la migración, los endpoints de `setup`) no cabe, se parte en tareas consecutivas sobre el mismo archivo.
 5. **Idioma** (art. IX): código, identificadores, rutas y commits en inglés; mensajes de UI y de error en español.
 6. **Art. V en cada tarea**: ninguna credencial en base de datos, logs, trazas, mensajes de error ni respuestas; ninguna PII del CV en logs ni en trazas.
+7. **Reporte con diff revisable al cerrar cada sub-bloque.** Los bloques B y C se ejecutan en sub-bloques (ver [Entrega incremental](#entrega-incremental)). Al terminar cada uno, el reporte incluye —además de la salida real de los comandos de verificación— la **lista de archivos creados o modificados con su conteo de líneas**:
+
+   ```bash
+   git diff --stat <último-commit-del-sub-bloque-anterior>..HEAD
+   ```
+
+   El objetivo es revisar el diff **antes** de aprobar el siguiente sub-bloque, no después. Ningún sub-bloque empieza sin esa aprobación explícita. El motivo está en [Por qué B y C van en sub-bloques](#por-qué-b-y-c-van-en-sub-bloques).
 
 ## Decisión de configuración: un solo `.env`, en la raíz del repositorio
 
@@ -441,13 +448,33 @@ Las fundaciones más la primera ejecución ya son un incremento demostrable: alg
 
 ### Entrega incremental
 
-1. Bloque A → checkpoint A → el repositorio es verificable y CI protege todo lo que venga después
-2. Bloque B → checkpoint B → **MVP demostrable**, prueba de instalación asistida posible
-3. US2 → siembra funcional contra el golden set
-4. US3 → gate de calidad del perfil
-5. US4 → objetivos
-6. US5 → confirmación y versionado; el producto queda habilitado
-7. Evals y Polish → checkpoint C y PR
+El bloque A se entregó completo, de una vez. **Los bloques B y C no**: se ejecutan en sub-bloques, con reporte, diff revisable y aprobación explícita entre cada uno (regla 7).
+
+Los **checkpoints siguen siendo tres**. Un sub-bloque cierra con reporte y aprobación; el checkpoint es otra cosa y solo ocurre al final de su bloque.
+
+| Sub-bloque | Tareas | Contenido | Cierra con |
+|---|---|---|---|
+| **A** | T001–T037 | Monorepo, tooling, Compose local, migración inicial, contrato tipado E2E, CI | **Checkpoint A** ✅ |
+| **B1** | T038–T047 | Puertos del LLM, matriz de capacidades, costo estimado, esquemas de preflight, adapter Google, factory y trazado | Reporte + diff |
+| **B2** | T048–T065 | Dominio del wizard, repositorios, servicios de preflight, catálogo y correo, endpoints `/setup/*`, tests de integración de US1 | Reporte + diff |
+| **B3** | T066–T071 | Frontend del wizard | **Checkpoint B** |
+| **C1** | T072–T077 | Dominio de entradas y completitud, storage y extracción de texto | Reporte + diff |
+| **C2** | T078–T090 | Prompts, pipeline determinista, repositorios y endpoints de US2 | Reporte + diff |
+| **C3** | T091–T098 | US3 — revisión y enriquecimiento del perfil | Reporte + diff |
+| **C4** | T099–T101 | US4 — cuestionario de objetivos | Reporte + diff |
+| **C5** | T102–T111 | US5 — confirmación explícita y versionado | Reporte + diff |
+| **C6** | T112–T116 | Evals contra el golden set | Reporte + diff |
+| **C7** | T117–T123 | Polish y transversales | **Checkpoint C** |
+
+El orden dentro de cada bloque no cambia: la numeración sigue siendo ejecutable en orden estricto y ninguna tarea depende de otra con ID mayor.
+
+### Por qué B y C van en sub-bloques
+
+El bloque A se ejecutó entero y se aprobó **sobre el reporte**, sin revisión del código intermedio. Funcionó, y funcionó por una razón concreta: **la infraestructura se verifica desde afuera**. El Compose levanta o no levanta, el endpoint responde o no responde, la migración revierte o no revierte. Un error se manifiesta como un fallo, y el checkpoint lo encuentra — de hecho encontró dos.
+
+Los bloques B y C no tienen esa propiedad. Tocan **credenciales** (FR-008, FR-013, SC-013), **PII del CV** (FR-045, FR-046) y el **guardrail de veracidad** del art. IV. Ahí un error no rompe el build: filtra una llave a un log, deja un fragmento de CV en una traza, o produce una afirmación sin sustento que el candidato acaba mandando a un reclutador con su nombre encima. Todo eso pasa un checkpoint en verde.
+
+Por eso el diff se revisa **antes** de construir encima, y no al final: los tres son los sitios donde el costo de descubrir tarde no es reescribir código, sino haber filtrado algo.
 
 ### Notas
 
