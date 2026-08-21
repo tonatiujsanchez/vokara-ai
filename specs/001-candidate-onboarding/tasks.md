@@ -223,12 +223,25 @@ cd ../frontend && npm run build                      # la pantalla de estado com
 
 ### Frontend del wizard
 
-- [ ] T066 [US1] Regenerar `frontend/openapi.json` y `frontend/src/api/schema.d.ts`; guard de primera ejecución en `frontend/src/routes/` que impide alcanzar `/onboarding` mientras `pending_step` no sea `null` (FR-002, FR-010)
-- [ ] T067 [P] [US1] `frontend/src/features/setup/disclosure/` — texto **completo en pantalla** sin ningún campo que llenar, acuse **nunca preseleccionado**, botón de continuar inhabilitado sin él; test RTL en `frontend/tests/setup/disclosure.test.tsx` (FR-001, FR-002, US1 AC1–AC2)
-- [ ] T068 [P] [US1] `frontend/src/features/setup/providers/` — dos configuraciones separadas con la razón de la separación en una línea, costo estimado de cada una **antes** de pedir ninguna llave, y una sola llave cuando el proveedor es el mismo; test RTL (FR-004, FR-005, US1 AC3–AC4)
-- [ ] T069 [P] [US1] `frontend/src/features/setup/providers/PreflightResult.tsx` — los cuatro resultados diferenciados y el acuse específico de degradación mostrando `affected_features`; test RTL de que sin acuse no se puede avanzar (FR-007, SC-016)
-- [ ] T070 [P] [US1] `frontend/src/features/setup/email/` — omitir con **el mismo peso visual** que continuar, qué se gana y qué **no** se pierde, y la divulgación de la App Password **antes** de pedir nada; test RTL (FR-011, FR-012, US1 AC9–AC10)
-- [ ] T071 [US1] `frontend/src/features/setup/hooks/` — queries y mutaciones de TanStack Query para el estado del wizard, con navegación automática al `pending_step` al reabrir (FR-014)
+- [X] T066 [US1] Regenerar `frontend/openapi.json` y `frontend/src/api/schema.d.ts`; guard de primera ejecución en `frontend/src/routes/` que impide alcanzar `/onboarding` mientras `pending_step` no sea `null` (FR-002, FR-010)
+
+  > **Alcance ampliado respecto de lo escrito.** «Regenerar» era un no-op: el
+  > esquema ya estaba sincronizado desde T060. Lo que no estaba sincronizado era
+  > el contrato con la realidad — `contracts/openapi.yaml` declara `Error` en
+  > cada respuesta de error de cada endpoint, la implementación no declaraba
+  > ninguna, y el esquema generado anunciaba `HTTPValidationError` en los 422,
+  > un cuerpo que la aplicación nunca devuelve porque el handler responde
+  > `VALIDATION_ERROR`. Sin cerrar ese hueco, el frontend tendría que escribir a
+  > mano el tipo del error para poder ramificar por `code`, que es justo lo que
+  > el art. I prohíbe y lo que el control de drift de CI no ve. T066 añade por
+  > tanto: `ErrorCode` como conjunto cerrado, `ValidationFailedError` en la
+  > jerarquía, el esquema publicado como `Error`, la declaración en los diez
+  > endpoints y `tests/unit/test_error_contract.py`.
+- [X] T067 [P] [US1] `frontend/src/features/setup/disclosure/` — texto **completo en pantalla** sin ningún campo que llenar, acuse **nunca preseleccionado**, botón de continuar inhabilitado sin él; test RTL en `frontend/tests/setup/disclosure.test.tsx` (FR-001, FR-002, US1 AC1–AC2)
+- [X] T068 [P] [US1] `frontend/src/features/setup/providers/` — dos configuraciones separadas con la razón de la separación en una línea, costo estimado de cada una **antes** de pedir ninguna llave, y una sola llave cuando el proveedor es el mismo; test RTL (FR-004, FR-005, US1 AC3–AC4)
+- [X] T069 [P] [US1] `frontend/src/features/setup/providers/PreflightResult.tsx` — los cuatro resultados diferenciados y el acuse específico de degradación mostrando `affected_features`; test RTL de que sin acuse no se puede avanzar (FR-007, SC-016)
+- [X] T070 [P] [US1] `frontend/src/features/setup/email/` — omitir con **el mismo peso visual** que continuar, qué se gana y qué **no** se pierde, y la divulgación de la App Password **antes** de pedir nada; test RTL (FR-011, FR-012, US1 AC9–AC10)
+- [X] T071 [US1] `frontend/src/features/setup/hooks/` — queries y mutaciones de TanStack Query para el estado del wizard, con navegación automática al `pending_step` al reabrir (FR-014)
 
 ---
 
@@ -241,14 +254,22 @@ cd backend && uv run pytest tests/unit tests/integration tests/architecture -q
 cd ../frontend && npm run test && npm run build
 ```
 
-- [ ] Recorrido manual completo de **quickstart §3, pasos 1 a 15**, sobre instalación limpia: `git clone` → `docker compose up` → divulgación → proveedores → correo → **"listo para subir CV"**, sin editar ni un archivo a mano
-- [ ] `POST /documents` con curl y sin acuse responde `409 DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED`: el gate es **de servidor**, no del guard de la SPA
-- [ ] Los cuatro resultados de preflight se distinguen; la degradación enumera funciones afectadas y exige acuse
-- [ ] Omitir embeddings **no** bloquea el onboarding (FR-010); omitir correo tampoco (FR-011)
-- [ ] Cerrar el navegador a mitad y volver retoma en el paso pendiente sin re-pedir acuse ni llaves
-- [ ] `test_no_credentials_leak.py` en verde: cero credenciales en cualquier superficie
-- [ ] El test de arquitectura del art. XI pasa; ningún nombre de proveedor fuera de `adapters/llm/`
-- [ ] **Cero marcas `xfail` vivas** en la suite: `uv run pytest -q -rx` no reporta xfails pendientes del bloque B
+- [ ] Recorrido manual completo de **quickstart §3, pasos 1 a 15**, sobre instalación limpia: `git clone` → `docker compose up` → divulgación → proveedores → correo → **"listo para subir CV"**, sin editar ni un archivo a mano — **pendiente: exige API keys reales, red y Docker; no es automatizable aquí**
+- [X] El gate de la divulgación es **de servidor**, no del guard de la SPA: `tests/integration/test_server_side_disclosure_gate.py` monta una ruta protegida por `require_disclosure_acknowledgement()` y verifica sobre HTTP real que sin acuse responde `409 DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED`, con el cuerpo que declara `contracts/openapi.yaml`
+
+  > **Por qué se desdobló, y no se relajó.** El bullet original nombraba `POST
+  > /documents`, que es **T086** (bloque C2): pedirlo como condición de salida
+  > del checkpoint B era una contradicción de este mismo archivo. El gate ya
+  > existía como función probada y sin ningún llamador, que es la peor forma de
+  > tenerlo — nadie lo había visto rechazar una petición. Este bullet lo ejerce
+  > ahora sobre HTTP real; el original vuelve **íntegro** al Checkpoint C, con
+  > la ruta real y con curl, que es donde SC-011 termina de verificarse.
+- [X] Los cuatro resultados de preflight se distinguen; la degradación enumera funciones afectadas y exige acuse — `tests/setup/preflight-result.test.tsx` (los cinco casos, con `provider_unreachable` aparte) y `tests/setup/providers.test.tsx`; en backend, `tests/integration/test_preflight_outcomes.py`
+- [X] Omitir embeddings **no** bloquea el onboarding (FR-010); omitir correo tampoco (FR-011) — `tests/setup/guard.test.tsx` (se llega al correo con embeddings sin resolver) y `tests/setup/providers.test.tsx` (se continúa con generación resuelta y embeddings nula)
+- [X] Cerrar el navegador a mitad y volver retoma en el paso pendiente sin re-pedir acuse ni llaves — `tests/setup/hooks.test.tsx`, que lo comprueba sobre las peticiones hechas y no sobre lo que se dibuja; en backend, `tests/integration/test_setup_resume.py`
+- [X] `test_no_credentials_leak.py` en verde: cero credenciales en cualquier superficie — 5 tests; además el frontend verifica que ni la API key ni la App Password quedan en el DOM
+- [X] El test de arquitectura del art. XI pasa; ningún nombre de proveedor fuera de `adapters/llm/` — 6 tests; verificado además que `frontend/src/` no contiene ningún nombre de proveedor, y los fixtures de los tests usan identificadores inventados a propósito
+- [X] **Cero marcas `xfail` vivas** en la suite: `uv run pytest -q -rx` no reporta ninguno — 509 passed, sin xfail ni xpass
 
 ---
 
@@ -373,6 +394,7 @@ cd ../frontend && npm run test && npm run build
 ## ✅ CHECKPOINT C — Onboarding
 
 - [ ] Recorrido manual completo de **quickstart §4** (subida → revisión → objetivos → confirmación → versión 2)
+- [ ] `POST /documents` con curl y sin acuse responde `409 DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED`: el gate es **de servidor**, no del guard de la SPA (SC-011; bullet trasladado desde el Checkpoint B, donde la ruta todavía no existía)
 - [ ] Todos los recorridos de rechazo de **quickstart §5** con su código y cero entradas creadas
 - [ ] Captura manual guiada llega a `complete` sin haber sembrado desde archivo (SC-010)
 - [ ] Reintento tras fallo conserva las entradas manuales y no duplica las sembradas (FR-023)
