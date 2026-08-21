@@ -32,6 +32,7 @@ from app.domain.errors import (
     ProviderNotOfferedError,
     ProviderQuotaExceededError,
     ProviderUnreachableError,
+    ValidationFailedError,
 )
 
 A_KEY = "AIzaSyD-una-llave-real-tendria-esta-forma-39-chars"
@@ -54,6 +55,9 @@ FIRST_RUN_ERRORS: tuple[DomainError, ...] = (
     EmailAppPasswordRejectedError(oauth_docs_url="https://ejemplo.invalid/oauth"),
     EmailLabelNotFoundError(help_url="https://ejemplo.invalid/etiquetas"),
     EmailProviderUnreachableError(),
+    # Transversal rather than first-run, but the rules of the catalogue are
+    # the rules of every message, and the check below walks the whole module.
+    ValidationFailedError(fields={"app_password": "Campo requerido."}),
 )
 
 # Where a technical detail would show up if one ever slipped into a message.
@@ -146,6 +150,7 @@ def test_the_http_status_matches_the_catalogue(error: DomainError) -> None:
         "EMAIL_APP_PASSWORD_REJECTED": 400,
         "EMAIL_LABEL_NOT_FOUND": 422,
         "EMAIL_PROVIDER_UNREACHABLE": 503,
+        "VALIDATION_ERROR": 422,
     }
 
     assert error.http_status == expected[error.code]

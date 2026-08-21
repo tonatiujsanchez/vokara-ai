@@ -676,8 +676,28 @@ components:
       properties:
         code:
           type: string
-          description: Código estable en inglés. Catálogo completo en contracts/errors.md.
-          examples: ["PDF_WITHOUT_TEXT_LAYER"]
+          description: |
+            Código estable en inglés. Catálogo completo en contracts/errors.md.
+            CONJUNTO CERRADO: el frontend ramifica sobre `code` y sobre nada más,
+            así que viaja como enum para que el cliente generado no pueda
+            ramificar sobre un código que ya no existe (art. I).
+            Los códigos de las features 002+ se añaden aquí al implementarlas.
+          enum:
+            - INTERNAL_ERROR
+            - VALIDATION_ERROR
+            - DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED
+            - DISCLOSURE_ALREADY_ACKNOWLEDGED
+            - PROVIDER_CREDENTIAL_REJECTED
+            - PROVIDER_QUOTA_EXCEEDED
+            - PROVIDER_UNREACHABLE
+            - MODEL_NOT_AVAILABLE
+            - PROVIDER_NOT_OFFERED
+            - DEGRADATION_ACKNOWLEDGEMENT_REQUIRED
+            - GENERATION_PROVIDER_REQUIRED
+            - EMAIL_APP_PASSWORD_REJECTED
+            - EMAIL_LABEL_NOT_FOUND
+            - EMAIL_PROVIDER_UNREACHABLE
+          examples: ["PROVIDER_QUOTA_EXCEEDED"]
         message:
           type: string
           description: |

@@ -24,7 +24,22 @@ from fastapi import APIRouter, status
 from pydantic import BaseModel, Field, SecretStr
 
 from app.api.deps import CandidateId
+from app.api.errors import error_responses
 from app.domain.capability import Capability
+from app.domain.errors import (
+    DegradationAcknowledgementRequiredError,
+    DisclosureAcknowledgementRequiredError,
+    DisclosureAlreadyAcknowledgedError,
+    EmailAppPasswordRejectedError,
+    EmailLabelNotFoundError,
+    EmailProviderUnreachableError,
+    ModelNotAvailableError,
+    ProviderCredentialRejectedError,
+    ProviderNotOfferedError,
+    ProviderQuotaExceededError,
+    ProviderUnreachableError,
+    ValidationFailedError,
+)
 from app.domain.setup import CredentialStatus, EmailStepStatus, SetupStep
 from app.services import (
     email_link_service,
@@ -302,6 +317,7 @@ def _state_model(view: SetupStateView) -> SetupStateModel:
     "/state",
     response_model=SetupStateModel,
     summary="Estado de la primera ejecución y paso pendiente",
+    responses=error_responses(),
 )
 def get_state(candidate_id: CandidateId) -> SetupStateModel:
     """Entry point of the SPA: where the wizard resumes, derived from the facts."""
@@ -312,6 +328,7 @@ def get_state(candidate_id: CandidateId) -> SetupStateModel:
     "/disclosure",
     response_model=DisclosureModel,
     summary="Texto vigente de la divulgación y estado de su acuse",
+    responses=error_responses(),
 )
 def get_disclosure(candidate_id: CandidateId) -> DisclosureModel:
     """The complete text: art. V forbids it being only a link or only the README."""
@@ -330,6 +347,11 @@ def get_disclosure(candidate_id: CandidateId) -> DisclosureModel:
     response_model=SetupStateModel,
     status_code=status.HTTP_201_CREATED,
     summary="Registra el acuse explícito de la divulgación",
+    responses=error_responses(
+        DisclosureAcknowledgementRequiredError,
+        DisclosureAlreadyAcknowledgedError,
+        ValidationFailedError,
+    ),
 )
 def post_disclosure_acknowledgement(
     candidate_id: CandidateId, payload: DisclosureAcknowledgementRequest
@@ -347,6 +369,7 @@ def post_disclosure_acknowledgement(
     "/providers/catalog",
     response_model=ProviderCatalogModel,
     summary="Proveedores ofrecibles por capacidad, con su costo estimado",
+    responses=error_responses(),
 )
 def get_provider_catalog() -> ProviderCatalogModel:
     """The closed list, already resolved: the frontend renders, it does not branch.
@@ -366,6 +389,7 @@ def get_provider_catalog() -> ProviderCatalogModel:
     "/providers/{capability}",
     response_model=ProviderConfigurationModel | None,
     summary="Configuración vigente de una capacidad",
+    responses=error_responses(ValidationFailedError),
 )
 def get_provider_configuration(
     candidate_id: CandidateId, capability: Capability
@@ -378,6 +402,14 @@ def get_provider_configuration(
     "/providers/{capability}",
     response_model=ProviderConfigurationModel,
     summary="Configura una capacidad y ejecuta su preflight",
+    responses=error_responses(
+        ProviderCredentialRejectedError,
+        ModelNotAvailableError,
+        ProviderQuotaExceededError,
+        ProviderUnreachableError,
+        ProviderNotOfferedError,
+        ValidationFailedError,
+    ),
 )
 def put_provider_configuration(
     candidate_id: CandidateId, capability: Capability, payload: ProviderCredentialRequest
@@ -406,6 +438,10 @@ def put_provider_configuration(
     response_model=ProviderConfigurationModel,
     status_code=status.HTTP_201_CREATED,
     summary="Acuse específico de una degradación explícita",
+    responses=error_responses(
+        DegradationAcknowledgementRequiredError,
+        ValidationFailedError,
+    ),
 )
 def post_degradation_acknowledgement(
     candidate_id: CandidateId, capability: Capability
@@ -426,7 +462,12 @@ def post_degradation_acknowledgement(
 # ── correo, paso opcional (FR-011 a FR-013) ─────────────────────────────────
 
 
-@router.get("/email", response_model=EmailStepModel, summary="Estado del paso de correo")
+@router.get(
+    "/email",
+    response_model=EmailStepModel,
+    summary="Estado del paso de correo",
+    responses=error_responses(),
+)
 def get_email_step(candidate_id: CandidateId) -> EmailStepModel:
     """Carries the disclosure with it, because FR-012 requires it **before**.
 
@@ -439,6 +480,12 @@ def get_email_step(candidate_id: CandidateId) -> EmailStepModel:
     "/email/link",
     response_model=EmailStepModel,
     summary="Vincula la cuenta de correo y verifica la etiqueta designada",
+    responses=error_responses(
+        EmailAppPasswordRejectedError,
+        EmailLabelNotFoundError,
+        EmailProviderUnreachableError,
+        ValidationFailedError,
+    ),
 )
 def post_email_link(candidate_id: CandidateId, payload: EmailLinkRequest) -> EmailStepModel:
     """Verifies the label exists before taking the link as established (FR-013).
@@ -456,7 +503,12 @@ def post_email_link(candidate_id: CandidateId, payload: EmailLinkRequest) -> Ema
     )
 
 
-@router.post("/email/skip", response_model=SetupStateModel, summary="Omite el paso de correo")
+@router.post(
+    "/email/skip",
+    response_model=SetupStateModel,
+    summary="Omite el paso de correo",
+    responses=error_responses(),
+)
 def post_email_skip(candidate_id: CandidateId) -> SetupStateModel:
     """One action, and the first run can conclude. A valid ending (FR-011)."""
     email_link_service.skip(candidate_id)

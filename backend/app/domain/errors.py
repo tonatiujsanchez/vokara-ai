@@ -18,13 +18,48 @@ Three rules hold for every message here:
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
+
+
+class ErrorCode(StrEnum):
+    """Every code the API can put in an error body. Closed on purpose.
+
+    `contracts/errors.md` says the frontend depends on `code` and on nothing
+    else to decide behaviour. A `str` would let it branch on a code that no
+    longer exists — a rename in this module and the SPA keeps compiling against
+    the old spelling, silently taking the wrong branch. As a closed enum the
+    code reaches `schema.d.ts` as a union of literals, so that same rename stops
+    the frontend build instead (art. I).
+
+    Every member has exactly one `DomainError` below, and
+    `tests/unit/test_error_contract.py` fails when that stops being true.
+    """
+
+    INTERNAL_ERROR = "INTERNAL_ERROR"
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+
+    DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED = "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED"
+    DISCLOSURE_ALREADY_ACKNOWLEDGED = "DISCLOSURE_ALREADY_ACKNOWLEDGED"
+
+    PROVIDER_CREDENTIAL_REJECTED = "PROVIDER_CREDENTIAL_REJECTED"
+    PROVIDER_QUOTA_EXCEEDED = "PROVIDER_QUOTA_EXCEEDED"
+    PROVIDER_UNREACHABLE = "PROVIDER_UNREACHABLE"
+    MODEL_NOT_AVAILABLE = "MODEL_NOT_AVAILABLE"
+    PROVIDER_NOT_OFFERED = "PROVIDER_NOT_OFFERED"
+    DEGRADATION_ACKNOWLEDGEMENT_REQUIRED = "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED"
+    GENERATION_PROVIDER_REQUIRED = "GENERATION_PROVIDER_REQUIRED"
+
+    # The suppression below is a false positive: an error code, not a credential.
+    EMAIL_APP_PASSWORD_REJECTED = "EMAIL_APP_PASSWORD_REJECTED"  # noqa: S105
+    EMAIL_LABEL_NOT_FOUND = "EMAIL_LABEL_NOT_FOUND"
+    EMAIL_PROVIDER_UNREACHABLE = "EMAIL_PROVIDER_UNREACHABLE"
 
 
 class DomainError(Exception):
     """Base of every error the product can explain to the candidate."""
 
-    code: str = "INTERNAL_ERROR"
+    code: ErrorCode = ErrorCode.INTERNAL_ERROR
     message: str = (
         "Ocurrió un error inesperado. Inténtalo de nuevo; si persiste, abre un issue "
         "con lo que aparece en la pantalla de diagnóstico."
@@ -47,7 +82,7 @@ class DisclosureAcknowledgementRequiredError(DomainError):
     record, so the check cannot live in the frontend.
     """
 
-    code = "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED"
+    code = ErrorCode.DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED
     message = (
         "Antes de continuar necesitamos que leas y aceptes qué datos se quedan en tu "
         "computadora y qué se envía a tu proveedor de IA."
@@ -64,7 +99,7 @@ class DisclosureAlreadyAcknowledgedError(DomainError):
     acknowledgement keeps the record a history of what actually happened.
     """
 
-    code = "DISCLOSURE_ALREADY_ACKNOWLEDGED"
+    code = ErrorCode.DISCLOSURE_ALREADY_ACKNOWLEDGED
     message = "Ya aceptaste esta versión de la divulgación. Puedes continuar con la configuración."
     http_status = 409
 
@@ -79,7 +114,7 @@ class DisclosureAlreadyAcknowledgedError(DomainError):
 class ProviderCredentialRejectedError(DomainError):
     """FR-007.1. Carries where to regenerate the key, never the key."""
 
-    code = "PROVIDER_CREDENTIAL_REJECTED"
+    code = ErrorCode.PROVIDER_CREDENTIAL_REJECTED
     message = (
         "Tu proveedor rechazó la API key. Verifica que la copiaste completa y que sigue "
         "activa en la consola de tu proveedor."
@@ -93,7 +128,7 @@ class ProviderCredentialRejectedError(DomainError):
 class ProviderQuotaExceededError(DomainError):
     """FR-007.4. Says out loud that the key works: it is the quota that does not."""
 
-    code = "PROVIDER_QUOTA_EXCEEDED"
+    code = ErrorCode.PROVIDER_QUOTA_EXCEEDED
     message = (
         "Tu API key es válida, pero alcanzaste el límite de tu cuota. Puedes esperar a que "
         "se reinicie o configurar otro proveedor."
@@ -104,7 +139,7 @@ class ProviderQuotaExceededError(DomainError):
 class ProviderUnreachableError(DomainError):
     """Not a statement about the credential: about the network (research R-23)."""
 
-    code = "PROVIDER_UNREACHABLE"
+    code = ErrorCode.PROVIDER_UNREACHABLE
     message = (
         "No pudimos comunicarnos con tu proveedor para verificar la llave. Revisa tu "
         "conexión e inténtalo de nuevo; no hace falta que vuelvas a escribirla."
@@ -119,7 +154,7 @@ class ModelNotAvailableError(DomainError):
     the user's own file, and the message says which one.
     """
 
-    code = "MODEL_NOT_AVAILABLE"
+    code = ErrorCode.MODEL_NOT_AVAILABLE
     message = (
         "El modelo configurado ya no está disponible en tu proveedor. Actualiza el nombre "
         "del modelo en tu configuración; en la documentación está el vigente."
@@ -133,7 +168,7 @@ class ModelNotAvailableError(DomainError):
 class ProviderNotOfferedError(DomainError):
     """FR-009: no empirical verification on record, so it is not on the list."""
 
-    code = "PROVIDER_NOT_OFFERED"
+    code = ErrorCode.PROVIDER_NOT_OFFERED
     # The catalogue's row reads «Ese proveedor todavía no está disponible en
     # Vokara.» and stops there. The next step is added because rule 3 of
     # contracts/errors.md applies to every message without exception, and
@@ -148,7 +183,7 @@ class ProviderNotOfferedError(DomainError):
 class DegradationAcknowledgementRequiredError(DomainError):
     """FR-007.3 and SC-016: the price of continuing with an unverified capability."""
 
-    code = "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED"
+    code = ErrorCode.DEGRADATION_ACKNOWLEDGEMENT_REQUIRED
     message = (
         "Para continuar con este proveedor necesitamos que confirmes que entiendes qué "
         "funciones no estarán disponibles."
@@ -167,7 +202,7 @@ class GenerationProviderRequiredError(DomainError):
     instead of a block.
     """
 
-    code = "GENERATION_PROVIDER_REQUIRED"
+    code = ErrorCode.GENERATION_PROVIDER_REQUIRED
     message = (
         "Antes de subir tu CV necesitas configurar tu proveedor de generación: es el que "
         "lee el documento y arma tu perfil."
@@ -184,7 +219,7 @@ class GenerationProviderRequiredError(DomainError):
 class EmailAppPasswordRejectedError(DomainError):
     """The warning was given before starting (FR-012); this closes it with a way out."""
 
-    code = "EMAIL_APP_PASSWORD_REJECTED"
+    code = ErrorCode.EMAIL_APP_PASSWORD_REJECTED
     # «cuenta de Workspace» and not the full brand: the guard of art. XI keeps
     # provider names out of `domain/`, and this text does not need the name to
     # be understood — it opens with the mail provider that rejected the password.
@@ -204,7 +239,7 @@ class EmailAppPasswordRejectedError(DomainError):
 class EmailLabelNotFoundError(DomainError):
     """The link is **not** taken as established: FR-013 verifies before believing."""
 
-    code = "EMAIL_LABEL_NOT_FOUND"
+    code = ErrorCode.EMAIL_LABEL_NOT_FOUND
     message = (
         "No encontramos esa etiqueta en tu cuenta. Créala en Gmail y aplica un filtro que "
         "mande ahí tus alertas de empleo; después vuelve a intentarlo."
@@ -218,9 +253,34 @@ class EmailLabelNotFoundError(DomainError):
 class EmailProviderUnreachableError(DomainError):
     """Reminds the candidate that the step is skippable, because it is."""
 
-    code = "EMAIL_PROVIDER_UNREACHABLE"
+    code = ErrorCode.EMAIL_PROVIDER_UNREACHABLE
     message = (
         "No pudimos conectarnos a tu correo en este momento. Inténtalo de nuevo, o "
         "continúa sin vincularlo: no bloquea nada."
     )
     http_status = 503
+
+
+# ── Transversal: cuerpo inválido ────────────────────────────────────────────
+
+
+class ValidationFailedError(DomainError):
+    """The generic Pydantic failure of contracts/errors.md, as a domain error.
+
+    It lives here and not inline in the exception handler so that every code the
+    API can emit has exactly one class in this module. That correspondence is
+    what `ErrorCode` closes and what lets the OpenAPI declare a single `Error`
+    schema whose `code` is an enum the frontend can exhaust (art. I).
+
+    `details.fields` carries the error per field, in Spanish. The field *names*
+    travel because they are names of the contract, never values the user typed:
+    echoing a value back would put document content or personal data in an error
+    message (FR-045, rule 1 of the catalogue).
+    """
+
+    code = ErrorCode.VALIDATION_ERROR
+    message = "Revisa los datos: hay campos con errores."
+    http_status = 422
+
+    def __init__(self, *, fields: dict[str, str] | None = None) -> None:
+        super().__init__({"fields": fields} if fields else None)

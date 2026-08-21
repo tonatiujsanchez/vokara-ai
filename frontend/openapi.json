@@ -232,6 +232,60 @@
         "title": "EmailStepStatus",
         "type": "string"
       },
+      "Error": {
+        "description": "The only error body the API returns.\n\nNamed after the schema of `contracts/openapi.yaml`, because the component\nkey OpenAPI publishes is this class's name: calling it anything else would\nput a second name for the same thing in the generated client. It is the\nerror *body*; the exception that produces it is `DomainError`.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Identificador estable en inglés del error. Conjunto cerrado: el frontend ramifica sobre él y no puede ramificar sobre uno inexistente."
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Datos estructurados del error: campos inválidos, bloqueadores, límites.",
+            "title": "Details"
+          },
+          "message": {
+            "description": "Texto accionable en español, resuelto por el backend.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "description": "Every code the API can put in an error body. Closed on purpose.\n\n`contracts/errors.md` says the frontend depends on `code` and on nothing\nelse to decide behaviour. A `str` would let it branch on a code that no\nlonger exists — a rename in this module and the SPA keeps compiling against\nthe old spelling, silently taking the wrong branch. As a closed enum the\ncode reaches `schema.d.ts` as a union of literals, so that same rename stops\nthe frontend build instead (art. I).\n\nEvery member has exactly one `DomainError` below, and\n`tests/unit/test_error_contract.py` fails when that stops being true.",
+        "enum": [
+          "INTERNAL_ERROR",
+          "VALIDATION_ERROR",
+          "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED",
+          "DISCLOSURE_ALREADY_ACKNOWLEDGED",
+          "PROVIDER_CREDENTIAL_REJECTED",
+          "PROVIDER_QUOTA_EXCEEDED",
+          "PROVIDER_UNREACHABLE",
+          "MODEL_NOT_AVAILABLE",
+          "PROVIDER_NOT_OFFERED",
+          "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED",
+          "GENERATION_PROVIDER_REQUIRED",
+          "EMAIL_APP_PASSWORD_REJECTED",
+          "EMAIL_LABEL_NOT_FOUND",
+          "EMAIL_PROVIDER_UNREACHABLE"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
       "EstimatedCostModel": {
         "description": "Cost per month of active search, shown before the key is asked for.",
         "properties": {
@@ -308,19 +362,6 @@
           "is_estimated"
         ],
         "title": "EstimatedCostModel",
-        "type": "object"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
-          }
-        },
-        "title": "HTTPValidationError",
         "type": "object"
       },
       "HealthResponse": {
@@ -668,46 +709,6 @@
         ],
         "title": "SetupStep",
         "type": "string"
-      },
-      "ValidationError": {
-        "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "title": "Location",
-            "type": "array"
-          },
-          "msg": {
-            "title": "Message",
-            "type": "string"
-          },
-          "type": {
-            "title": "Error Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError",
-        "type": "object"
       }
     }
   },
@@ -731,6 +732,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Estado de la instancia local",
@@ -753,6 +764,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Texto vigente de la divulgación y estado de su acuse",
@@ -786,15 +807,35 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED · DISCLOSURE_ALREADY_ACKNOWLEDGED"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Registra el acuse explícito de la divulgación",
@@ -817,6 +858,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Estado del paso de correo",
@@ -850,15 +901,45 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "EMAIL_APP_PASSWORD_REJECTED"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "EMAIL_LABEL_NOT_FOUND · VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "EMAIL_PROVIDER_UNREACHABLE"
           }
         },
         "summary": "Vincula la cuenta de correo y verifica la etiqueta designada",
@@ -881,6 +962,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Omite el paso de correo",
@@ -903,6 +994,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Proveedores ofrecibles por capacidad, con su costo estimado",
@@ -948,11 +1049,21 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Configuración vigente de una capacidad",
@@ -994,15 +1105,55 @@
             },
             "description": "Successful Response"
           },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "MODEL_NOT_AVAILABLE · PROVIDER_CREDENTIAL_REJECTED"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "PROVIDER_NOT_OFFERED · VALIDATION_ERROR"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "PROVIDER_QUOTA_EXCEEDED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "PROVIDER_UNREACHABLE"
           }
         },
         "summary": "Configura una capacidad y ejecuta su preflight",
@@ -1036,15 +1187,35 @@
             },
             "description": "Successful Response"
           },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED"
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Acuse específico de una degradación explícita",
@@ -1067,6 +1238,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Estado de la primera ejecución y paso pendiente",

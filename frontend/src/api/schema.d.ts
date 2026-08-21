@@ -364,6 +364,47 @@ export interface components {
          */
         EmailStepStatus: "pending" | "linked" | "skipped";
         /**
+         * Error
+         * @description The only error body the API returns.
+         *
+         *     Named after the schema of `contracts/openapi.yaml`, because the component
+         *     key OpenAPI publishes is this class's name: calling it anything else would
+         *     put a second name for the same thing in the generated client. It is the
+         *     error *body*; the exception that produces it is `DomainError`.
+         */
+        Error: {
+            /** @description Identificador estable en inglés del error. Conjunto cerrado: el frontend ramifica sobre él y no puede ramificar sobre uno inexistente. */
+            code: components["schemas"]["ErrorCode"];
+            /**
+             * Details
+             * @description Datos estructurados del error: campos inválidos, bloqueadores, límites.
+             */
+            details?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Message
+             * @description Texto accionable en español, resuelto por el backend.
+             */
+            message: string;
+        };
+        /**
+         * ErrorCode
+         * @description Every code the API can put in an error body. Closed on purpose.
+         *
+         *     `contracts/errors.md` says the frontend depends on `code` and on nothing
+         *     else to decide behaviour. A `str` would let it branch on a code that no
+         *     longer exists — a rename in this module and the SPA keeps compiling against
+         *     the old spelling, silently taking the wrong branch. As a closed enum the
+         *     code reaches `schema.d.ts` as a union of literals, so that same rename stops
+         *     the frontend build instead (art. I).
+         *
+         *     Every member has exactly one `DomainError` below, and
+         *     `tests/unit/test_error_contract.py` fails when that stops being true.
+         * @enum {string}
+         */
+        ErrorCode: "INTERNAL_ERROR" | "VALIDATION_ERROR" | "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED" | "DISCLOSURE_ALREADY_ACKNOWLEDGED" | "PROVIDER_CREDENTIAL_REJECTED" | "PROVIDER_QUOTA_EXCEEDED" | "PROVIDER_UNREACHABLE" | "MODEL_NOT_AVAILABLE" | "PROVIDER_NOT_OFFERED" | "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED" | "GENERATION_PROVIDER_REQUIRED" | "EMAIL_APP_PASSWORD_REJECTED" | "EMAIL_LABEL_NOT_FOUND" | "EMAIL_PROVIDER_UNREACHABLE";
+        /**
          * EstimatedCostModel
          * @description Cost per month of active search, shown before the key is asked for.
          */
@@ -395,11 +436,6 @@ export interface components {
              * @description El supuesto de uso que produce la cifra, para que sea interpretable.
              */
             usage_assumption_es?: string | null;
-        };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
         };
         /** HealthResponse */
         HealthResponse: {
@@ -569,19 +605,6 @@ export interface components {
          * @enum {string}
          */
         SetupStep: "disclosure" | "providers" | "email";
-        /** ValidationError */
-        ValidationError: {
-            /** Context */
-            ctx?: Record<string, never>;
-            /** Input */
-            input?: unknown;
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
     };
     responses: never;
     parameters: never;
@@ -609,6 +632,15 @@ export interface operations {
                     "application/json": components["schemas"]["HealthResponse"];
                 };
             };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     get_disclosure_api_v1_setup_disclosure_get: {
@@ -627,6 +659,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DisclosureModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -653,13 +694,31 @@ export interface operations {
                     "application/json": components["schemas"]["SetupStateModel"];
                 };
             };
-            /** @description Validation Error */
+            /** @description DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED · DISCLOSURE_ALREADY_ACKNOWLEDGED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -680,6 +739,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailStepModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -706,13 +774,40 @@ export interface operations {
                     "application/json": components["schemas"]["EmailStepModel"];
                 };
             };
-            /** @description Validation Error */
+            /** @description EMAIL_APP_PASSWORD_REJECTED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description EMAIL_LABEL_NOT_FOUND · VALIDATION_ERROR */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description EMAIL_PROVIDER_UNREACHABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -735,6 +830,15 @@ export interface operations {
                     "application/json": components["schemas"]["SetupStateModel"];
                 };
             };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     get_provider_catalog_api_v1_setup_providers_catalog_get: {
@@ -753,6 +857,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProviderCatalogModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -777,13 +890,22 @@ export interface operations {
                     "application/json": components["schemas"]["ProviderConfigurationModel"] | null;
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -812,13 +934,49 @@ export interface operations {
                     "application/json": components["schemas"]["ProviderConfigurationModel"];
                 };
             };
-            /** @description Validation Error */
+            /** @description MODEL_NOT_AVAILABLE · PROVIDER_CREDENTIAL_REJECTED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PROVIDER_NOT_OFFERED · VALIDATION_ERROR */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PROVIDER_QUOTA_EXCEEDED */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PROVIDER_UNREACHABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -843,13 +1001,31 @@ export interface operations {
                     "application/json": components["schemas"]["ProviderConfigurationModel"];
                 };
             };
-            /** @description Validation Error */
+            /** @description DEGRADATION_ACKNOWLEDGEMENT_REQUIRED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -870,6 +1046,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetupStateModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
