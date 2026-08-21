@@ -2,31 +2,16 @@ import { screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import type { components } from "@/api/schema";
-
+import { firstRunHandlers, type PendingStep } from "../msw/handlers";
 import { server } from "../msw/server";
 import { renderAt } from "./renderWithClient";
 
-type SetupState = components["schemas"]["SetupStateModel"];
-// `exactOptionalPropertyTypes` makes the optional field include `undefined`;
-// the wizard only ever deals with a step or its absence.
-type PendingStep = NonNullable<SetupState["pending_step"]> | null;
-
 /**
- * Typed against the generated schema: a field renamed in the backend stops this
- * mock compiling too, instead of leaving a green test over a broken app (art. I).
+ * Mounting the real route table means the guard picks a screen and that screen
+ * fetches its own data, so every first-run endpoint is answered here.
  */
-const state = (pending: PendingStep): SetupState => ({
-  pending_step: pending,
-  disclosure_acknowledged: pending !== "disclosure",
-  disclosure_acknowledged_at: null,
-  providers: { generation: null, embeddings: null },
-  email_status: "pending",
-  is_complete: pending === null,
-});
-
 function setupStateIs(pending: PendingStep): void {
-  server.use(http.get("*/api/v1/setup/state", () => HttpResponse.json(state(pending))));
+  server.use(...firstRunHandlers(pending));
 }
 
 describe("guard de primera ejecución", () => {
@@ -35,8 +20,8 @@ describe("guard de primera ejecución", () => {
 
     renderAt("/onboarding");
 
-    expect(await screen.findByRole("heading", { name: /Antes de empezar/ })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /Todo listo/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Antes de empezar" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Todo listo" })).not.toBeInTheDocument();
   });
 
   it("manda al paso pendiente aunque falte solo el de correo (FR-010)", async () => {
@@ -52,7 +37,7 @@ describe("guard de primera ejecución", () => {
 
     renderAt("/onboarding");
 
-    expect(await screen.findByRole("heading", { name: /Todo listo/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Todo listo" })).toBeInTheDocument();
   });
 
   it("no deja saltarse un paso escribiendo la dirección de otro posterior", async () => {
@@ -60,7 +45,7 @@ describe("guard de primera ejecución", () => {
 
     renderAt("/setup/email");
 
-    expect(await screen.findByRole("heading", { name: /Antes de empezar/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Antes de empezar" })).toBeInTheDocument();
   });
 
   it("no vuelve a mostrar el wizard una vez terminado (FR-015)", async () => {
@@ -68,7 +53,7 @@ describe("guard de primera ejecución", () => {
 
     renderAt("/setup/disclosure");
 
-    expect(await screen.findByRole("heading", { name: /Todo listo/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Todo listo" })).toBeInTheDocument();
   });
 
   it("al reabrir, la raíz aterriza en el paso pendiente (FR-014)", async () => {
@@ -87,7 +72,7 @@ describe("guard de primera ejecución", () => {
     renderAt("/onboarding");
 
     expect(await screen.findByText(/Revisa que Docker esté corriendo/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /Todo listo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Todo listo" })).not.toBeInTheDocument();
   });
 
   it("la pantalla de diagnóstico es alcanzable sin pasar por el wizard", async () => {
