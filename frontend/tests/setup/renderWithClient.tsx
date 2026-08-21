@@ -16,9 +16,20 @@ function testClient(): QueryClient {
   });
 }
 
-/** Mount one component, for the presentational tests. */
+/**
+ * Mount one screen, for the tests that are about that screen.
+ *
+ * Inside a router, because a screen that navigates is a screen that uses the
+ * router's hooks, and mounting it without one would only prove it renders in a
+ * context the application never gives it.
+ */
 export function renderWithClient(ui: ReactElement): RenderResult {
-  return render(<QueryClientProvider client={testClient()}>{ui}</QueryClientProvider>);
+  const router = createMemoryRouter([{ path: "*", element: ui }], { initialEntries: ["/"] });
+  return render(
+    <QueryClientProvider client={testClient()}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
 }
 
 /**

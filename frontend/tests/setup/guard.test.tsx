@@ -2,7 +2,12 @@ import { screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { firstRunHandlers, type PendingStep } from "../msw/handlers";
+import {
+  firstRunHandlers,
+  setupState,
+  verifiedConfiguration,
+  type PendingStep,
+} from "../msw/handlers";
 import { server } from "../msw/server";
 import { renderAt } from "./renderWithClient";
 
@@ -62,7 +67,42 @@ describe("guard de primera ejecución", () => {
     renderAt("/");
 
     expect(
-      await screen.findByRole("heading", { name: /Tus proveedores de IA/ }),
+      await screen.findByRole("heading", { level: 1, name: /Tus proveedores de IA/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("deja llegar al correo con embeddings sin resolver (FR-010)", async () => {
+    // `pending_step` sigue diciendo `providers` mientras embeddings no esté
+    // resuelto y el correo siga pendiente (app/domain/setup.py). Es una pista
+    // de dónde retomar, no un permiso: tratarla como permiso dejaría
+    // `/setup/email` inalcanzable, y como omitir el correo es lo que concluye
+    // la primera ejecución, quien no configure embeddings no podría terminarla
+    // nunca. Eso es exactamente el bloqueo que FR-010 prohíbe.
+    server.use(
+      http.get("*/api/v1/setup/state", () =>
+        HttpResponse.json({
+          ...setupState("email"),
+          pending_step: "providers",
+          providers: { generation: verifiedConfiguration("generation"), embeddings: null },
+        }),
+      ),
+      ...firstRunHandlers("providers"),
+    );
+
+    renderAt("/setup/email");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /Vincular tu correo/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("no deja llegar al correo mientras generación no esté resuelta (FR-010)", async () => {
+    setupStateIs("providers");
+
+    renderAt("/setup/email");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /Tus proveedores de IA/ }),
     ).toBeInTheDocument();
   });
 
