@@ -69,6 +69,26 @@ function prerequisiteOf(step: SetupStep, state: SetupState): SetupStep | null {
   return null;
 }
 
+/**
+ * Whether the step has nothing left to ask for.
+ *
+ * A satisfied step is not re-shown: recording the acknowledgement moves the
+ * wizard on by itself, and no screen has to call `navigate()` for it. Note that
+ * `providers` counts as satisfied on generation alone — embeddings is optional
+ * (FR-010) — so a candidate who resolved generation but not embeddings is kept
+ * on the step by `pending_step`, not pushed off it by this.
+ */
+function isSatisfied(step: SetupStep, state: SetupState): boolean {
+  switch (step) {
+    case "disclosure":
+      return state.disclosure_acknowledged;
+    case "providers":
+      return state.providers.generation?.is_usable === true;
+    case "email":
+      return state.email_status !== "pending";
+  }
+}
+
 export function FirstRunGuard({ requires }: { requires: Requirement }): JSX.Element {
   const state = useSetupState();
 
@@ -83,8 +103,16 @@ export function FirstRunGuard({ requires }: { requires: Requirement }): JSX.Elem
   }
   if (pending === null) return <Navigate to="/onboarding" replace />;
 
-  const missing = prerequisiteOf(requires.step, state.data);
-  return missing === null ? <Outlet /> : <Navigate to={stepPath(missing)} replace />;
+  const { step } = requires;
+  const missing = prerequisiteOf(step, state.data);
+  if (missing !== null) return <Navigate to={stepPath(missing)} replace />;
+
+  // Done with this one and the wizard has moved: follow it.
+  if (isSatisfied(step, state.data) && pending !== step) {
+    return <Navigate to={stepPath(pending)} replace />;
+  }
+
+  return <Outlet />;
 }
 
 /**
