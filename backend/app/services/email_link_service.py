@@ -30,6 +30,7 @@ from app.adapters.email.base import EmailFailure, EmailPort, EmailPortError
 from app.adapters.email.gmail_imap import (
     EMAIL_DISCLOSURE_MD,
     LABEL_HELP_URL,
+    LINKED_CONFIRMATION_ES,
     OAUTH_DOCS_URL,
     VALUE_IF_LINKED_ES,
     VALUE_IF_SKIPPED_ES,
@@ -75,6 +76,11 @@ class EmailStepView:
     credential_status: CredentialStatus
     value_if_linked_es: str
     value_if_skipped_es: str
+    # What the candidate is owed once the link succeeds: which label was
+    # verified, named, and what Vokara does with it today. `None` in every other
+    # state — there is nothing to confirm about a step that was skipped or never
+    # taken (FR-013, ADR-012).
+    linked_confirmation_es: str | None = None
     configuration_notice_es: str | None = None
     # Always true (FR-011). A field and not a constant so the contract can state
     # it and the frontend can render the two options with the same weight.
@@ -117,6 +123,11 @@ def read_step(candidate_id: UUID, settings: Settings | None = None) -> EmailStep
         ),
         value_if_linked_es=VALUE_IF_LINKED_ES,
         value_if_skipped_es=VALUE_IF_SKIPPED_ES,
+        linked_confirmation_es=(
+            LINKED_CONFIRMATION_ES.format(label=label)
+            if status is EmailStepStatus.LINKED and label is not None
+            else None
+        ),
     )
 
 

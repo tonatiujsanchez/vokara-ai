@@ -935,6 +935,15 @@ components:
             continuar y NUNCA bloquea el onboarding.
         value_if_linked_es: { type: string, description: Qué se gana vinculando. }
         value_if_skipped_es: { type: string, description: Qué NO se pierde al omitirlo. }
+        linked_confirmation_es:
+          type: [string, 'null']
+          description: |
+            Confirmación de la vinculación, presente SOLO cuando `status` es
+            `linked`. Nombra la etiqueta que se verificó y dice qué hace Vokara
+            con ella hoy. Es la contraparte del aviso de FR-012: si antes de
+            pedir la App Password se dijo que leer solo esa etiqueta es un
+            compromiso de Vokara y no un permiso que el proveedor imponga, el
+            candidato tiene que ver CUÁL quedó designada (FR-013, ADR-012).
         configuration_notice_es:
           type: [string, 'null']
           description: |

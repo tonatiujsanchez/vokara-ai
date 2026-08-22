@@ -341,6 +341,11 @@ export interface components {
             /** Linked At */
             linked_at?: string | null;
             /**
+             * Linked Confirmation Es
+             * @description Confirmación de la vinculación, presente SOLO cuando `status` es `linked`. Nombra la etiqueta verificada y dice qué hace Vokara con ella hoy: es la contraparte del aviso de FR-012, que promete leer solo esa etiqueta.
+             */
+            linked_confirmation_es?: string | null;
+            /**
              * Oauth Docs Url
              * @description Vía alternativa para cuentas sin App Passwords.
              */

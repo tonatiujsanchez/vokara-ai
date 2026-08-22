@@ -321,6 +321,45 @@ def test_linking_verifies_the_label_before_believing_it(
     assert body["label"] == "Alertas de empleo"
 
 
+def test_the_link_confirms_which_label_was_verified_and_what_is_done_with_it(
+    setup_client: TestClient, mailbox: MailboxDirector
+) -> None:
+    """The counterpart of the warning of FR-012 (FR-013, ADR-012).
+
+    Before the App Password is asked for, Vokara says out loud that the password
+    opens the WHOLE mailbox and that reading only the designated label is a
+    promise of ours, not a limit the provider enforces. A promise made in those
+    terms has to come back answered, naming the label — and saying what this
+    version actually does with it, which is nothing: reading mail is not in 001.
+    """
+    label = "Alertas de empleo"
+
+    linked = setup_client.post(
+        f"{BASE}/email/link",
+        json={
+            "email_address": "candidata@example.com",
+            "app_password": "abcd efgh ijkl mnop",
+            "label": label,
+        },
+    ).json()
+
+    for body in (linked, setup_client.get(f"{BASE}/email").json()):
+        confirmation = body["linked_confirmation_es"]
+        assert label in confirmation
+        assert "todavía no lee ningún correo" in confirmation
+
+
+def test_nothing_is_confirmed_about_a_step_that_was_never_linked(
+    setup_client: TestClient,
+) -> None:
+    """`null` while pending, and `null` after skipping: there is no link to confirm."""
+    assert setup_client.get(f"{BASE}/email").json()["linked_confirmation_es"] is None
+
+    setup_client.post(f"{BASE}/email/skip")
+
+    assert setup_client.get(f"{BASE}/email").json()["linked_confirmation_es"] is None
+
+
 def test_a_label_that_does_not_exist_leaves_the_step_pending(
     setup_client: TestClient, mailbox: MailboxDirector
 ) -> None:

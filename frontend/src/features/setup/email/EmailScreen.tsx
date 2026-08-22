@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { messageOf } from "@/features/setup/hooks/apiError";
@@ -23,13 +25,26 @@ import { EmailLinkForm } from "./EmailLinkForm";
  * - **The disclosure comes first.** It is on screen before the form exists, and
  *   the form only appears once the candidate has chosen to link (FR-012).
  *
- * Neither ending navigates by hand: resolving the step changes `pending_step`
- * to `null` and the guard moves on. The first run is over either way.
+ * **The two endings navigate differently, and that asymmetry is the point.**
+ * Skipping *is* the decision to move on, so it moves on. Linking is not: it
+ * produces a result the candidate has to see before going anywhere, and until
+ * this was fixed they never did — resolving the step turned `pending_step` into
+ * `null` and the guard sent them to the onboarding, so a successful link and a
+ * failed one looked exactly alike from the outside.
+ *
+ * What the confirmation says is owed rather than decorative. FR-012 makes
+ * Vokara admit, before asking for the App Password, that the password opens the
+ * whole mailbox and that reading only the designated label is a promise of ours
+ * and not a limit Google imposes. A promise in those terms has to come back
+ * answered: which label was verified, by name. The backend writes that sentence
+ * — the wording of this step has one owner (art. IX) — and it also says what
+ * this version does with it, which today is nothing.
  */
 export function EmailScreen(): JSX.Element {
   const step = useEmailStep();
   const link = useLinkEmail();
   const skip = useSkipEmail();
+  const navigate = useNavigate();
   const [linking, setLinking] = useState(false);
 
   if (step.isPending) {
@@ -50,6 +65,24 @@ export function EmailScreen(): JSX.Element {
   }
 
   const busy = link.isPending || skip.isPending;
+  const linked = step.data.status === "linked";
+  const finish = (): void => void navigate("/onboarding");
+
+  // Once it is linked there is nothing left to choose here: the options and the
+  // form would be asking again for something already decided.
+  if (linked) {
+    return (
+      <main className="mx-auto max-w-2xl p-8">
+        <h1 className="text-2xl font-semibold">Vincular tu correo</h1>
+        <Alert tone="good" className="mt-6">
+          <p>{step.data.linked_confirmation_es}</p>
+        </Alert>
+        <Button className="mt-6" onClick={finish}>
+          Continuar
+        </Button>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-2xl p-8">
@@ -85,7 +118,7 @@ export function EmailScreen(): JSX.Element {
         <Button disabled={busy} onClick={() => setLinking(true)}>
           Vincular mi Gmail
         </Button>
-        <Button disabled={busy} onClick={() => skip.mutate()}>
+        <Button disabled={busy} onClick={() => skip.mutate(undefined, { onSuccess: finish })}>
           {skip.isPending ? "Omitiendo…" : "Omitir este paso"}
         </Button>
       </div>
