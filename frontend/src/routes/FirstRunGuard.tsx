@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 
 import { messageOf } from "@/features/setup/hooks/apiError";
@@ -70,13 +71,26 @@ function prerequisiteOf(step: SetupStep, state: SetupState): SetupStep | null {
 }
 
 /**
- * Whether the step has nothing left to ask for.
+ * Whether the step had nothing left to ask for **when the candidate arrived**.
  *
- * A satisfied step is not re-shown: recording the acknowledgement moves the
- * wizard on by itself, and no screen has to call `navigate()` for it. Note that
- * `providers` counts as satisfied on generation alone — embeddings is optional
- * (FR-010) — so a candidate who resolved generation but not embeddings is kept
- * on the step by `pending_step`, not pushed off it by this.
+ * The «when they arrived» is the whole of it, and it used to be missing. Read on
+ * every render, this turned the guard into an auto-advancer: a preflight that
+ * resolved the last capability moved `pending_step` to `email`, the invalidated
+ * query re-rendered the guard, and the screen was replaced before anyone could
+ * read the result — the verified block with its vector dimension, or the
+ * degradation with its reasons. FR-007 asks for four results told apart, and a
+ * result nobody sees is not told apart from anything.
+ *
+ * Arriving at a step that is already done is a different situation: the
+ * candidate typed an old address or reopened the application, and sending them
+ * where the wizard actually is is the resume of FR-014.
+ *
+ * So: redirect on arrival, never on a change that happens while they stand
+ * here. What happens after an action belongs to the screen that owns the
+ * action — Vokara proposes, the candidate decides (art. X).
+ *
+ * Note that `providers` counts as satisfied on generation alone — embeddings is
+ * optional (FR-010).
  */
 function isSatisfied(step: SetupStep, state: SetupState): boolean {
   switch (step) {
@@ -91,6 +105,15 @@ function isSatisfied(step: SetupStep, state: SetupState): boolean {
 
 export function FirstRunGuard({ requires }: { requires: Requirement }): JSX.Element {
   const state = useSetupState();
+
+  // Latched on the first render that has an answer, and never recomputed: the
+  // question is «was this step already done when we got here», and that has one
+  // answer per visit. React Router mounts a fresh guard per route, so moving to
+  // another step asks it again.
+  const satisfiedOnArrival = useRef<boolean | null>(null);
+  if (satisfiedOnArrival.current === null && state.isSuccess && requires.kind === "step") {
+    satisfiedOnArrival.current = isSatisfied(requires.step, state.data);
+  }
 
   if (state.isPending) return <Waiting />;
   if (state.isError) return <Unreachable message={messageOf(state.error)} />;
@@ -107,8 +130,8 @@ export function FirstRunGuard({ requires }: { requires: Requirement }): JSX.Elem
   const missing = prerequisiteOf(step, state.data);
   if (missing !== null) return <Navigate to={stepPath(missing)} replace />;
 
-  // Done with this one and the wizard has moved: follow it.
-  if (isSatisfied(step, state.data) && pending !== step) {
+  // Already done before they got here, and the wizard has moved on: follow it.
+  if (satisfiedOnArrival.current === true && pending !== step) {
     return <Navigate to={stepPath(pending)} replace />;
   }
 

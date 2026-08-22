@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { messageOf } from "@/features/setup/hooks/apiError";
 import { useAcknowledgeDisclosure, useDisclosure } from "@/features/setup/hooks/useDisclosure";
@@ -13,10 +14,20 @@ import { DisclosureText } from "./DisclosureText";
  * at all means the current text has no acknowledgement on record, so seeding a
  * checkbox from anything would be a step towards a preselected one, which
  * FR-002 forbids outright.
+ *
+ * **This screen advances itself, and that is not boilerplate.** Its one button
+ * means «continue», so continuing is what pressing it does. The guard used to
+ * do it as a side effect of the step becoming satisfied, which also dragged the
+ * provider step away from a preflight result nobody had read yet (art. X,
+ * FR-007). Navigation belongs to the screen that owns the action.
+ *
+ * The mutation awaits its own invalidation, so by the time this runs the guard
+ * on the next step already sees the acknowledgement and will not bounce back.
  */
 export function DisclosureScreen(): JSX.Element {
   const disclosure = useDisclosure();
   const acknowledge = useAcknowledgeDisclosure();
+  const navigate = useNavigate();
   const [acknowledged, setAcknowledged] = useState(false);
 
   if (disclosure.isPending) {
@@ -41,7 +52,11 @@ export function DisclosureScreen(): JSX.Element {
       bodyMd={disclosure.data.body_md}
       acknowledged={acknowledged}
       onAcknowledgedChange={setAcknowledged}
-      onContinue={() => acknowledge.mutate(disclosure.data.version)}
+      onContinue={() =>
+        acknowledge.mutate(disclosure.data.version, {
+          onSuccess: () => void navigate("/setup/providers"),
+        })
+      }
       isSubmitting={acknowledge.isPending}
       error={acknowledge.isError ? messageOf(acknowledge.error) : null}
     />
