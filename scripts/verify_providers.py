@@ -131,11 +131,14 @@ class CandidateExtract(BaseModel):
     )
 
 
+# Identico, byte a byte, al del producto: app/adapters/llm/prompts/preflight_v2.py.
+# Si divergen, esta prueba certifica un prompt que la app no usa.
 SYSTEM_PROMPT = (
-    "Extraes informacion de un CV a un esquema estructurado.\n"
-    "REGLA CRITICA: si un dato NO aparece de forma explicita en el texto, el campo "
-    "DEBE quedar en null (o lista vacia). Nunca infieras, estimes ni inventes un "
-    "valor plausible. Es preferible un campo vacio a un dato no verificable."
+    "Extraes información de un CV a un esquema estructurado.\n"
+    "REGLA CRÍTICA: si un dato NO aparece de forma explícita en el texto, el "
+    "campo DEBE quedar en null (o lista vacía). Nunca infieras, estimes ni "
+    "inventes un valor plausible. Es preferible un campo vacío a un dato no "
+    "verificable."
 )
 
 # CV de prueba deliberadamente INCOMPLETO. Los huecos son la prueba:
@@ -144,23 +147,24 @@ SYSTEM_PROMPT = (
 #   - sin anos de experiencia declarados
 #   - sin titulo en la educacion
 #   - segundo empleo sin logros
+# Identico al INCOMPLETE_CV_SAMPLE del producto, acentos incluidos.
 TEST_CV = """
-Maria Lopez Hernandez
+María López Hernández
 maria.lopez@example.com
 
 EXPERIENCIA
 
-Desarrolladora Backend — Tecnologias del Norte
+Desarrolladora Backend — Tecnologías del Norte
 2021-03 a 2024-06
 - Reduje el tiempo de respuesta de la API de 800ms a 210ms
-- Migre el sistema de pagos a una arquitectura de eventos
+- Migré el sistema de pagos a una arquitectura de eventos
 
 Desarrolladora Junior — Soluciones Integrales
-Participe en el mantenimiento de aplicaciones internas.
+Participé en el mantenimiento de aplicaciones internas.
 
-EDUCACION
+EDUCACIÓN
 
-Universidad Autonoma de Guerrero
+Universidad Autónoma de Guerrero
 
 HABILIDADES
 Python, FastAPI, PostgreSQL, Docker
@@ -211,10 +215,49 @@ class Result:
     embeddings: str = "no probado"
     embedding_dim: int | None = None
     error: str = ""
+    # Por que fallo, clasificado igual que en el adapter. Sin esto, un fallo de
+    # esquema se reportaba como "error de llave" —porque key_ok solo se pone a
+    # True DESPUES de que el invoke completa—, y esa etiqueta manda a regenerar
+    # una llave que funciona perfectamente.
+    failure: str = ""
 
 
 def check_nulls(parsed: CandidateExtract) -> list[str]:
     return [label for label, ok in HALLUCINATION_CHECKS if not ok(parsed)]
+
+
+# Los mismos marcadores y los mismos estados que app/adapters/llm/google.py.
+# Este script y el adapter tienen que estar de acuerdo sobre que significa cada
+# fallo: si discrepan, la fila del ADR-011 describe una prueba distinta de la que
+# el producto corre.
+_STATUS_TO_FAILURE: dict[int, str] = {
+    401: "credential",
+    403: "credential",
+    404: "model_not_available",
+    429: "quota",
+}
+_REJECTED_KEY_MARKERS = ("api key", "api_key", "api-key", "credential")
+
+
+def classify_failure(error: BaseException) -> str:
+    """Por que fallo la llamada. Una respuesta que no valida NO es un fallo de llave."""
+    from pydantic import ValidationError
+
+    if isinstance(error, ValidationError) or type(error).__name__ == "OutputParserException":
+        return "schema"
+
+    status = getattr(error, "code", None) or getattr(error, "status_code", None)
+    if isinstance(status, int):
+        if status in _STATUS_TO_FAILURE:
+            return _STATUS_TO_FAILURE[status]
+        # 400 es ambiguo en Gemini: llave invalida y peticion malformada comparten
+        # codigo. Solo el texto los distingue.
+        text = str(getattr(error, "message", "") or "").lower()
+        if status == 400 and any(marker in text for marker in _REJECTED_KEY_MARKERS):
+            return "credential"
+        return "unreachable"
+
+    return "unreachable"
 
 
 # ---------------------------------------------------------------------------
@@ -298,10 +341,14 @@ def probe_embeddings(provider: str, model: str | None) -> tuple[str, int | None]
 #
 # Los nombres de modelo cambian seguido. Puedes sobreescribir cualquiera sin
 # editar este archivo:
-#     export VOKARA_GOOGLE_MODEL=gemini-3.5-flash-lite
+#     export VOKARA_GOOGLE_MODEL=gemini-3.6-flash
 #     export VOKARA_GOOGLE_EMBED=gemini-embedding-2
+#
+# Los defaults de abajo son los mismos que backend/app/core/config.py. Tienen que
+# serlo: si el script prueba un modelo distinto del que la app llama, la fila que
+# produce certifica algo que el producto no reproduce (ADR-011).
 PROVIDERS: dict[str, tuple[str, str, str | None]] = {
-    "google": ("GOOGLE_API_KEY", "gemini-3.6-flash", "models/gemini-embedding-001"),
+    "google": ("GOOGLE_API_KEY", "gemini-3.5-flash-lite", "models/gemini-embedding-001"),
     "openai": ("OPENAI_API_KEY", "gpt-4o-mini", "text-embedding-3-small"),
     "anthropic": ("ANTHROPIC_API_KEY", "claude-sonnet-4-5-20250929", None),
     "deepseek": ("DEEPSEEK_API_KEY", "deepseek-chat", None),
@@ -362,7 +409,11 @@ def verify(provider: str) -> Result | None:
 
     except Exception as exc:  # noqa: BLE001
         res.error = f"{type(exc).__name__}: {exc}"
-        print(f"  ERROR: {res.error[:200]}")
+        res.failure = classify_failure(exc)
+        # La llave sirvio: el proveedor respondio, lo que fallo fue la respuesta.
+        if res.failure in {"schema", "quota"}:
+            res.key_ok = True
+        print(f"  ERROR: [{res.failure}] {res.error[:200]}")
         low = str(exc).lower()
         if "not_found" in low or "404" in low or "does not exist" in low:
             print(
@@ -384,8 +435,15 @@ def render_table(results: list[Result]) -> str:
         "| Proveedor | Modelo | Salida estructurada | Respeta null | Embeddings | Dim | Verificado |",
         "|---|---|---|---|---|---|---|",
     ]
+    labels = {
+        "schema": "No",
+        "credential": "error de llave",
+        "model_not_available": "modelo no disponible",
+        "quota": "cuota agotada",
+        "unreachable": "sin respuesta",
+    }
     for r in results:
-        struct = "Si" if r.structured_ok else ("No" if r.key_ok else "error de llave")
+        struct = "Si" if r.structured_ok else labels.get(r.failure, "sin respuesta")
         nulls = "Si" if r.null_ok else ("No" if r.structured_ok else "n/a")
         dim = str(r.embedding_dim) if r.embedding_dim else "n/a"
         lines.append(
