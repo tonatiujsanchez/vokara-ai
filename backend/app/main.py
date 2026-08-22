@@ -14,7 +14,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request, Response
 
 from app.api.errors import register_error_handlers
-from app.api.v1 import health
+from app.api.v1 import health, setup
 from app.core.logging import bind_request_id, clear_log_context, configure_logging
 
 API_V1_PREFIX = "/api/v1"
@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
 
     register_error_handlers(app)
     app.include_router(health.router, prefix=API_V1_PREFIX)
+    app.include_router(setup.router, prefix=API_V1_PREFIX)
 
     return app
 

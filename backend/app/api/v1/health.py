@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.api.errors import error_responses
 from app.services.health_service import read_health
 
 router = APIRouter(tags=["health"])
@@ -19,7 +20,12 @@ class HealthResponse(BaseModel):
     )
 
 
-@router.get("/health", response_model=HealthResponse, summary="Estado de la instancia local")
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Estado de la instancia local",
+    responses=error_responses(),
+)
 def get_health() -> HealthResponse:
     report = read_health()
     return HealthResponse(

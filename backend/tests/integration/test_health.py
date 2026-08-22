@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from app.db.session import get_engine, get_session_factory
 from app.main import app
+from tests.integration.conftest import alembic_head
 
 
 @pytest.fixture
@@ -35,7 +36,7 @@ def test_health_reports_the_revision_read_from_the_database(client: TestClient) 
     assert response.json() == {
         "status": "ok",
         "database": "ok",
-        "migration_revision": "0001",
+        "migration_revision": alembic_head(),
     }
 
 

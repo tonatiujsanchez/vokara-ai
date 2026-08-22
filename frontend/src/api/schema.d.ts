@@ -21,10 +21,422 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/setup/disclosure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Texto vigente de la divulgación y estado de su acuse
+         * @description The complete text: art. V forbids it being only a link or only the README.
+         */
+        get: operations["get_disclosure_api_v1_setup_disclosure_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/disclosure-acknowledgement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Registra el acuse explícito de la divulgación
+         * @description Recorded with its timestamp and the version accepted (FR-002, R-29).
+         */
+        post: operations["post_disclosure_acknowledgement_api_v1_setup_disclosure_acknowledgement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado del paso de correo
+         * @description Carries the disclosure with it, because FR-012 requires it **before**.
+         *
+         *     A warning that arrives after the form has been filled in is not a warning.
+         */
+        get: operations["get_email_step_api_v1_setup_email_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/email/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Vincula la cuenta de correo y verifica la etiqueta designada
+         * @description Verifies the label exists before taking the link as established (FR-013).
+         *
+         *     Its three failures leave with their own code and none of them blocks
+         *     anything: the step stays skippable at every point.
+         */
+        post: operations["post_email_link_api_v1_setup_email_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/email/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Omite el paso de correo
+         * @description One action, and the first run can conclude. A valid ending (FR-011).
+         */
+        post: operations["post_email_skip_api_v1_setup_email_skip_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/providers/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Proveedores ofrecibles por capacidad, con su costo estimado
+         * @description The closed list, already resolved: the frontend renders, it does not branch.
+         *
+         *     The cost travels here so it can be shown **before** any key is asked for
+         *     (FR-005), estimated separately for each capability.
+         */
+        get: operations["get_provider_catalog_api_v1_setup_providers_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/providers/{capability}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Configuración vigente de una capacidad
+         * @description `null` when nothing is configured. Never the credential (FR-008).
+         */
+        get: operations["get_provider_configuration_api_v1_setup_providers__capability__get"];
+        /**
+         * Configura una capacidad y ejecuta su preflight
+         * @description The preflight runs **here**, at save time, never deferred (FR-006).
+         *
+         *     The three results that do not allow progress leave through the error
+         *     catalogue with their own status and code, because they are three different
+         *     situations and the frontend has to be able to tell them apart without
+         *     reading prose (contracts/errors.md).
+         */
+        put: operations["put_provider_configuration_api_v1_setup_providers__capability__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/providers/{capability}/degradation-acknowledgement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acuse específico de una degradación explícita
+         * @description The only way a capability without guarantee becomes usable (FR-007.3).
+         *
+         *     Answered 409 when the current preflight is not `capability_unverified`:
+         *     there is no degradation to acknowledge, and recording one would be a
+         *     consent to nothing.
+         */
+        post: operations["post_degradation_acknowledgement_api_v1_setup_providers__capability__degradation_acknowledgement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/setup/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Estado de la primera ejecución y paso pendiente
+         * @description Entry point of the SPA: where the wizard resumes, derived from the facts.
+         */
+        get: operations["get_state_api_v1_setup_state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AffectedFeatureModel
+         * @description A concrete function lost to a degradation, never a generic warning.
+         */
+        AffectedFeatureModel: {
+            /**
+             * Code
+             * @description Identificador estable en inglés de la función afectada.
+             */
+            code: string;
+            /**
+             * Message
+             * @description Qué deja de funcionar y por qué, en español.
+             */
+            message: string;
+        };
+        /**
+         * Capability
+         * @description What Vokara needs from a provider, configured independently (ADR-011).
+         * @enum {string}
+         */
+        Capability: "generation" | "embeddings";
+        /**
+         * CredentialStatus
+         * @description Everything the API may ever say about a credential (FR-008, SC-013).
+         *
+         *     Three values and no fourth. Not the key, not the last four characters, not a
+         *     length: «ni siquiera parcialmente» is the wording of the requirement, and a
+         *     closed enum is what makes it impossible to answer with anything else.
+         * @enum {string}
+         */
+        CredentialStatus: "configured" | "not_configured" | "rejected";
+        /**
+         * DisclosureAcknowledgementRequest
+         * @description `acknowledged` is `True` and nothing else: continuing is not accepting.
+         */
+        DisclosureAcknowledgementRequest: {
+            /**
+             * Acknowledged
+             * @description Acuse explícito y afirmativo. NUNCA preseleccionado, NUNCA inferido (FR-002).
+             * @constant
+             */
+            acknowledged: true;
+            /** Disclosure Version */
+            disclosure_version: string;
+        };
+        /**
+         * DisclosureModel
+         * @description The full text of the disclosure of art. V, to be shown on screen.
+         */
+        DisclosureModel: {
+            /** Acknowledged */
+            acknowledged: boolean;
+            /** Acknowledged At */
+            acknowledged_at?: string | null;
+            /**
+             * Acknowledged Version
+             * @description Versión efectivamente acusada; un acuse viejo no cubre un texto nuevo.
+             */
+            acknowledged_version?: string | null;
+            /**
+             * Body Md
+             * @description Texto completo en español. Nunca solo un enlace.
+             */
+            body_md: string;
+            /** Version */
+            version: string;
+        };
+        /**
+         * EmailLinkRequest
+         * @description The App Password travels in the body, is used once and never returned.
+         */
+        EmailLinkRequest: {
+            /**
+             * App Password
+             * Format: password
+             * @description Write-only; jamás se devuelve.
+             */
+            app_password: string;
+            /** Email Address */
+            email_address: string;
+            /**
+             * Label
+             * @description Etiqueta de Gmail a la que Vokara restringe cada consulta.
+             */
+            label: string;
+        };
+        /**
+         * EmailStepModel
+         * @description The optional step, with everything needed to decide (FR-011, FR-012).
+         */
+        EmailStepModel: {
+            /** Configuration Notice Es */
+            configuration_notice_es?: string | null;
+            credential_status: components["schemas"]["CredentialStatus"];
+            /**
+             * Disclosure Md
+             * @description Divulgación obligatoria PREVIA a pedir credencial alguna (FR-012).
+             */
+            disclosure_md: string;
+            /**
+             * Is Skippable
+             * @description Siempre verdadero (FR-011): omitir tiene el mismo peso que continuar.
+             * @default true
+             * @constant
+             */
+            is_skippable: true;
+            /**
+             * Label
+             * @description Etiqueta designada. Nunca la credencial.
+             */
+            label?: string | null;
+            /** Linked At */
+            linked_at?: string | null;
+            /**
+             * Oauth Docs Url
+             * @description Vía alternativa para cuentas sin App Passwords.
+             */
+            oauth_docs_url: string;
+            status: components["schemas"]["EmailStepStatus"];
+            /**
+             * Value If Linked Es
+             * @description Qué se gana vinculando.
+             */
+            value_if_linked_es: string;
+            /**
+             * Value If Skipped Es
+             * @description Qué NO se pierde al omitirlo.
+             */
+            value_if_skipped_es: string;
+        };
+        /**
+         * EmailStepStatus
+         * @description The optional step: pending until the candidate links **or** skips it.
+         * @enum {string}
+         */
+        EmailStepStatus: "pending" | "linked" | "skipped";
+        /**
+         * Error
+         * @description The only error body the API returns.
+         *
+         *     Named after the schema of `contracts/openapi.yaml`, because the component
+         *     key OpenAPI publishes is this class's name: calling it anything else would
+         *     put a second name for the same thing in the generated client. It is the
+         *     error *body*; the exception that produces it is `DomainError`.
+         */
+        Error: {
+            /** @description Identificador estable en inglés del error. Conjunto cerrado: el frontend ramifica sobre él y no puede ramificar sobre uno inexistente. */
+            code: components["schemas"]["ErrorCode"];
+            /**
+             * Details
+             * @description Datos estructurados del error: campos inválidos, bloqueadores, límites.
+             */
+            details?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Message
+             * @description Texto accionable en español, resuelto por el backend.
+             */
+            message: string;
+        };
+        /**
+         * ErrorCode
+         * @description Every code the API can put in an error body. Closed on purpose.
+         *
+         *     `contracts/errors.md` says the frontend depends on `code` and on nothing
+         *     else to decide behaviour. A `str` would let it branch on a code that no
+         *     longer exists — a rename in this module and the SPA keeps compiling against
+         *     the old spelling, silently taking the wrong branch. As a closed enum the
+         *     code reaches `schema.d.ts` as a union of literals, so that same rename stops
+         *     the frontend build instead (art. I).
+         *
+         *     Every member has exactly one `DomainError` below, and
+         *     `tests/unit/test_error_contract.py` fails when that stops being true.
+         * @enum {string}
+         */
+        ErrorCode: "INTERNAL_ERROR" | "VALIDATION_ERROR" | "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED" | "DISCLOSURE_ALREADY_ACKNOWLEDGED" | "PROVIDER_CREDENTIAL_REJECTED" | "PROVIDER_QUOTA_EXCEEDED" | "PROVIDER_UNREACHABLE" | "MODEL_NOT_AVAILABLE" | "PROVIDER_NOT_OFFERED" | "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED" | "GENERATION_PROVIDER_REQUIRED" | "EMAIL_APP_PASSWORD_REJECTED" | "EMAIL_LABEL_NOT_FOUND" | "EMAIL_PROVIDER_UNREACHABLE";
+        /**
+         * EstimatedCostModel
+         * @description Cost per month of active search, shown before the key is asked for.
+         */
+        EstimatedCostModel: {
+            /**
+             * Amount Usd
+             * @description `null` mientras el cálculo esté pendiente.
+             */
+            amount_usd?: number | null;
+            /**
+             * Currency
+             * @default USD
+             * @constant
+             */
+            currency: "USD";
+            /** Free Tier Note Es */
+            free_tier_note_es?: string | null;
+            /** Has Free Tier */
+            has_free_tier?: boolean | null;
+            /**
+             * Is Estimated
+             * @description Falso mientras no haya cifra: la ausencia se dice, no se inventa.
+             */
+            is_estimated: boolean;
+            /** Pending Note Es */
+            pending_note_es?: string | null;
+            /**
+             * Usage Assumption Es
+             * @description El supuesto de uso que produce la cifra, para que sea interpretable.
+             */
+            usage_assumption_es?: string | null;
+        };
         /** HealthResponse */
         HealthResponse: {
             /**
@@ -43,6 +455,161 @@ export interface components {
              */
             status: string;
         };
+        /**
+         * PreflightOutcomeModel
+         * @description One preflight result. Carries no key and no technical trace (FR-007).
+         */
+        PreflightOutcomeModel: {
+            /**
+             * Affected Features
+             * @description Funciones concretas afectadas. No vacío cuando el resultado es `capability_unverified`.
+             */
+            affected_features?: components["schemas"]["AffectedFeatureModel"][];
+            /**
+             * Checked At
+             * Format: date-time
+             * @description Cuándo se verificó, no cuándo se guardó.
+             */
+            checked_at: string;
+            /**
+             * Degradation Reasons
+             * @description POR QUÉ no se dio por verificada la capacidad, en español y observado en el preflight: qué campo inventó el modelo, o que la respuesta no tenía la estructura pedida. FR-007.3 exige enumerar las funciones afectadas «y por qué»; `affected_features` es lo primero y esto lo segundo. NUNCA una traza técnica ni el texto crudo del proveedor.
+             */
+            degradation_reasons?: string[];
+            /**
+             * Embedding Dim
+             * @description Dimensión verificada del vector; presente cuando `embeddings` quedó verificado.
+             */
+            embedding_dim?: number | null;
+            /**
+             * Message
+             * @description Mensaje accionable en español.
+             */
+            message: string;
+            /**
+             * Result
+             * @description `verified`, `capability_unverified`, `credential_rejected` o `quota_exceeded`.
+             */
+            result: string;
+        };
+        /**
+         * ProviderCatalogModel
+         * @description Two closed lists, because they are two independent choices (ADR-011).
+         */
+        ProviderCatalogModel: {
+            /** Embeddings */
+            embeddings: components["schemas"]["ProviderOptionModel"][];
+            /** Generation */
+            generation: components["schemas"]["ProviderOptionModel"][];
+            /** Separation Reason Es */
+            separation_reason_es: string;
+        };
+        /**
+         * ProviderConfigurationModel
+         * @description The configuration of one capability, as the wizard renders it.
+         */
+        ProviderConfigurationModel: {
+            capability: components["schemas"]["Capability"];
+            /**
+             * Configuration Notice Es
+             * @description Aviso de configuración: se emite cuando la misma credencial también está definida en el entorno y Vokara usará la del asistente.
+             */
+            configuration_notice_es?: string | null;
+            /** @description Único estado consultable de una credencial. NUNCA la llave (FR-008). */
+            credential_status: components["schemas"]["CredentialStatus"];
+            /** Degradation Acknowledged At */
+            degradation_acknowledged_at?: string | null;
+            /**
+             * Is Usable
+             * @description Derivado: verificada, o sin garantía CON acuse. Es el gate de FR-010.
+             */
+            is_usable: boolean;
+            /**
+             * Model
+             * @description Modelo efectivamente verificado.
+             */
+            model: string;
+            preflight: components["schemas"]["PreflightOutcomeModel"];
+            /**
+             * Provider
+             * @description Identificador del catálogo cerrado.
+             */
+            provider: string;
+        };
+        /**
+         * ProviderCredentialRequest
+         * @description The key travels in the body, is used for the preflight and is never returned.
+         */
+        ProviderCredentialRequest: {
+            /**
+             * Api Key
+             * Format: password
+             * @description Credencial del usuario. Write-only; jamás se devuelve.
+             */
+            api_key: string;
+            /**
+             * Model
+             * @description Opcional. Sin él se usa el modelo por defecto de la configuración.
+             */
+            model?: string | null;
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * ProviderOptionModel
+         * @description One offerable option. Only appears if its verification is on record.
+         */
+        ProviderOptionModel: {
+            /**
+             * Credential Url
+             * @description Dónde se obtiene la llave.
+             */
+            credential_url: string;
+            /**
+             * Default Model
+             * @description De configuración, nunca de una constante.
+             */
+            default_model: string;
+            /** Display Name */
+            display_name: string;
+            /** Embedding Dim */
+            embedding_dim?: number | null;
+            estimated_cost: components["schemas"]["EstimatedCostModel"];
+            /** Is Suggested Default */
+            is_suggested_default: boolean;
+            /** Provider */
+            provider: string;
+        };
+        /**
+         * ProvidersModel
+         * @description Both capabilities, `null` where nothing has been configured.
+         */
+        ProvidersModel: {
+            embeddings?: components["schemas"]["ProviderConfigurationModel"] | null;
+            generation?: components["schemas"]["ProviderConfigurationModel"] | null;
+        };
+        /**
+         * SetupStateModel
+         * @description The facts of the first run, and the two values derived from them.
+         */
+        SetupStateModel: {
+            /** Disclosure Acknowledged */
+            disclosure_acknowledged: boolean;
+            /** Disclosure Acknowledged At */
+            disclosure_acknowledged_at?: string | null;
+            email_status: components["schemas"]["EmailStepStatus"];
+            /** Is Complete */
+            is_complete: boolean;
+            /** @description `null` ⇔ la primera ejecución concluyó y no vuelve a mostrarse. */
+            pending_step?: components["schemas"]["SetupStep"] | null;
+            providers: components["schemas"]["ProvidersModel"];
+        };
+        /**
+         * SetupStep
+         * @description The step the wizard resumes at. Derived, never stored.
+         * @enum {string}
+         */
+        SetupStep: "disclosure" | "providers" | "email";
     };
     responses: never;
     parameters: never;
@@ -68,6 +635,431 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_disclosure_api_v1_setup_disclosure_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DisclosureModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_disclosure_acknowledgement_api_v1_setup_disclosure_acknowledgement_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DisclosureAcknowledgementRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStateModel"];
+                };
+            };
+            /** @description DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED · DISCLOSURE_ALREADY_ACKNOWLEDGED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_email_step_api_v1_setup_email_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailStepModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_email_link_api_v1_setup_email_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailStepModel"];
+                };
+            };
+            /** @description EMAIL_APP_PASSWORD_REJECTED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description EMAIL_LABEL_NOT_FOUND · VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description EMAIL_PROVIDER_UNREACHABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_email_skip_api_v1_setup_email_skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStateModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_provider_catalog_api_v1_setup_providers_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderCatalogModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_provider_configuration_api_v1_setup_providers__capability__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability: components["schemas"]["Capability"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConfigurationModel"] | null;
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_provider_configuration_api_v1_setup_providers__capability__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability: components["schemas"]["Capability"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderCredentialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConfigurationModel"];
+                };
+            };
+            /** @description MODEL_NOT_AVAILABLE · PROVIDER_CREDENTIAL_REJECTED */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PROVIDER_NOT_OFFERED · VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PROVIDER_QUOTA_EXCEEDED */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description PROVIDER_UNREACHABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_degradation_acknowledgement_api_v1_setup_providers__capability__degradation_acknowledgement_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                capability: components["schemas"]["Capability"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderConfigurationModel"];
+                };
+            };
+            /** @description DEGRADATION_ACKNOWLEDGEMENT_REQUIRED */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description VALIDATION_ERROR */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_state_api_v1_setup_state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStateModel"];
+                };
+            };
+            /** @description INTERNAL_ERROR */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

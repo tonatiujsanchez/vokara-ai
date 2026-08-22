@@ -174,61 +174,74 @@ cd ../frontend && npm run build                      # la pantalla de estado com
 
 ### Art. XI y forma de los puertos (escribir el test primero)
 
-- [ ] T038 [P] [US1] Test de arquitectura del art. XI en `backend/tests/architecture/test_provider_name_isolation.py`: falla si el nombre de un proveedor (`google`, `gemini`, `openai`, `anthropic`, `deepseek`, `kimi`, `moonshot`) aparece **fuera de `backend/app/adapters/llm/`** —en `services/`, `domain/`, `api/`, `db/`, `workers/` o en los tests de esas capas— y si `temperature`, `top_p` o `top_k` aparecen en `services/` o en la firma de un puerto (research R-22, R-25)
-- [ ] T039 [US1] Puertos en `backend/app/adapters/llm/base.py`: `StructuredOutputPort.generate` y `EmbeddingsPort` (`model_name`, `dimensions`, `embed_texts`) exactamente como los fija `contracts/llm-extraction.md`, **sin parámetros de muestreo en la firma** y con `base_url` y credencial opcionales resueltos en la implementación; test de forma en `backend/tests/unit/test_port_shape.py`
-- [ ] T040 [P] [US1] `backend/app/domain/capability.py` — `Capability` (`generation` | `embeddings`) y el tipo suma `PreflightOutcome` de **cuatro** variantes (`Verified`, `CapabilityUnverified`, `CredentialRejected`, `QuotaExceeded`) más `ProviderUnreachable` como caso de entorno distinto; tests unitarios de exhaustividad en `backend/tests/unit/test_preflight_outcome.py`
+- [X] T038 [P] [US1] Test de arquitectura del art. XI en `backend/tests/architecture/test_provider_name_isolation.py`: falla si el nombre de un proveedor (`google`, `gemini`, `openai`, `anthropic`, `deepseek`, `kimi`, `moonshot`) aparece **fuera de `backend/app/adapters/llm/`** —en `services/`, `domain/`, `api/`, `db/`, `workers/` o en los tests de esas capas— y si `temperature`, `top_p` o `top_k` aparecen en `services/` o en la firma de un puerto (research R-22, R-25)
+- [X] T039 [US1] Puertos en `backend/app/adapters/llm/base.py`: `StructuredOutputPort.generate` y `EmbeddingsPort` (`model_name`, `dimensions`, `embed_texts`) exactamente como los fija `contracts/llm-extraction.md`, **sin parámetros de muestreo en la firma** y con `base_url` y credencial opcionales resueltos en la implementación; test de forma en `backend/tests/unit/test_port_shape.py`
+- [X] T040 [P] [US1] `backend/app/domain/capability.py` — `Capability` (`generation` | `embeddings`) y el tipo suma `PreflightOutcome` de **cuatro** variantes (`Verified`, `CapabilityUnverified`, `CredentialRejected`, `QuotaExceeded`) más `ProviderUnreachable` como caso de entorno distinto; tests unitarios de exhaustividad en `backend/tests/unit/test_preflight_outcome.py`
 
 ### Matriz de capacidades, costo estimado y esquemas de preflight
 
-- [ ] T041 [P] [US1] Escribir antes, con `@pytest.mark.xfail(strict=True, reason="verde en T042")`: `backend/tests/unit/test_capabilities_matrix.py` — la matriz declara **cinco** filas, solo las que tienen `verified_on` no nulo entran en el catálogo ofrecible, el catálogo de generación y el de embeddings son consultas distintas, y Anthropic declara `embeddings=False` explícito (no "sin verificar")
-- [ ] T042 [US1] `backend/app/adapters/llm/capabilities.py` — matriz del ADR-011 declarada como **dato inmutable** (`@dataclass(frozen=True) ProviderCapabilities` con `structured_output`, `respects_null_in_optionals`, `embeddings`, `embedding_dim`, `verified_on`), con las cinco filas y solo Google verificado el 2026-08-11. **Quita el `xfail` de T041** (research R-22, FR-009)
-- [ ] T043 [P] [US1] `backend/app/adapters/llm/pricing.py` — catálogo declarativo de costo estimado **por separado** para generación y embeddings, con el supuesto de uso a la vista y qué cabe en la capa gratuita; tests en `backend/tests/unit/test_pricing_catalog.py` (FR-005, research R-27)
-- [ ] T044 [P] [US1] `backend/app/adapters/llm/schemas.py` — esquema Pydantic **anidado con campos opcionales** para el preflight de generación sobre un CV deliberadamente incompleto (sin teléfono, empleo sin fechas, educación sin título) y esquema del preflight de embeddings; el criterio de aprobación es que el modelo devuelva `null` en vez de inventar (art. IV, `contracts/llm-extraction.md` §0)
+- [X] T041 [P] [US1] Escribir antes, con `@pytest.mark.xfail(strict=True, reason="verde en T042")`: `backend/tests/unit/test_capabilities_matrix.py` — la matriz declara **cinco** filas, solo las que tienen `verified_on` no nulo entran en el catálogo ofrecible, el catálogo de generación y el de embeddings son consultas distintas, y Anthropic declara `embeddings=False` explícito (no "sin verificar")
+- [X] T042 [US1] `backend/app/adapters/llm/capabilities.py` — matriz del ADR-011 declarada como **dato inmutable** (`@dataclass(frozen=True) ProviderCapabilities` con `structured_output`, `respects_null_in_optionals`, `embeddings`, `embedding_dim`, `verified_on`), con las cinco filas y solo Google verificado el 2026-08-11. **Quita el `xfail` de T041** (research R-22, FR-009)
+- [X] T043 [P] [US1] `backend/app/adapters/llm/pricing.py` — catálogo declarativo de costo estimado **por separado** para generación y embeddings, con el supuesto de uso a la vista y qué cabe en la capa gratuita; tests en `backend/tests/unit/test_pricing_catalog.py` (FR-005, research R-27)
+- [X] T044 [P] [US1] `backend/app/adapters/llm/schemas.py` — esquema Pydantic **anidado con campos opcionales** para el preflight de generación sobre un CV deliberadamente incompleto (sin teléfono, empleo sin fechas, educación sin título) y esquema del preflight de embeddings; el criterio de aprobación es que el modelo devuelva `null` en vez de inventar (art. IV, `contracts/llm-extraction.md` §0)
 
 ### Implementación Google, factory y trazado
 
-- [ ] T045 [US1] `backend/app/adapters/llm/google.py` — **única** implementación de v1 (langchain-google-genai) de ambos puertos con `with_structured_output`, `output_dimensionality=768` en embeddings, 3 reintentos con backoff exponencial ante red/429/salida no conforme, y **clasificación de los errores del proveedor a las cuatro variantes** más `ProviderUnreachable`. La clasificación vive aquí, nunca en el servicio (`contracts/llm-extraction.md`)
-- [ ] T046 [US1] `backend/app/adapters/llm/factory.py` — resuelve el puerto desde `Settings`; **único módulo** que traduce un `ProviderId` a una implementación, y único lugar donde puede aparecer un nombre de proveedor junto a `capabilities.py`
-- [ ] T047 [US1] `backend/app/adapters/llm/tracing.py` — decorador que registra en structlog y en `llm_call_logs`: `capability`, `purpose`, `model`, `prompt_version`, tokens de entrada y salida, costo estimado, latencia, `attempt` y `outcome`. **Nunca** el prompt, el texto ni la respuesta; test en `backend/tests/unit/test_tracing_has_no_content.py` (art. VIII, FR-046, research R-13)
+- [X] T045 [US1] `backend/app/adapters/llm/google.py` — **única** implementación de v1 (langchain-google-genai) de ambos puertos con `with_structured_output`, `output_dimensionality=768` en embeddings, 3 reintentos con backoff exponencial ante red/429/salida no conforme, y **clasificación de los errores del proveedor a las cuatro variantes** más `ProviderUnreachable`. La clasificación vive aquí, nunca en el servicio (`contracts/llm-extraction.md`)
+- [X] T046 [US1] `backend/app/adapters/llm/factory.py` — resuelve el puerto desde `Settings`; **único módulo** que traduce un `ProviderId` a una implementación, y único lugar donde puede aparecer un nombre de proveedor junto a `capabilities.py`
+- [X] T047 [US1] `backend/app/adapters/llm/tracing.py` — decorador que registra en structlog y en `llm_call_logs`: `capability`, `purpose`, `model`, `prompt_version`, tokens de entrada y salida, costo estimado, latencia, `attempt` y `outcome`. **Nunca** el prompt, el texto ni la respuesta; test en `backend/tests/unit/test_tracing_has_no_content.py` (art. VIII, FR-046, research R-13)
 
 ### Estado del wizard, repositorios y servicios
 
-- [ ] T048 [P] [US1] `backend/app/domain/setup.py` — `pending_step` **derivado por reglas** (`disclosure` → `providers` → `email` → `null`), nunca persistido como puntero; tests exhaustivos de las cuatro ramas en `backend/tests/unit/test_setup_pending_step.py` (research R-18, FR-014)
-- [ ] T049 [P] [US1] `backend/app/db/repositories/{setup_state_repository,provider_configuration_repository}.py` con `candidate_id` explícito; test con **dos** `candidate_id` en `backend/tests/integration/test_setup_repository_scoping.py`
-- [ ] T050 [US1] `backend/app/services/preflight_service.py` — ejecuta el preflight **al guardar cada credencial**, nunca diferido; **único intérprete** de los cuatro resultados; calcula el `credential_fingerprint` (HMAC-SHA256 truncado con clave derivada local, `hmac` de la estándar) y **invalida la fila cuando la credencial cambia** (research R-23, R-24, SC-012)
-- [ ] T051 [US1] `backend/app/services/provider_catalog_service.py` — catálogo ofrecible = matriz filtrada por `verified_on is not None` y por capacidad, más el costo estimado de `pricing.py`; **el frontend no ramifica por proveedor**, renderiza lo que este servicio devuelve (art. XI)
-- [ ] T052 [US1] `backend/app/services/setup_service.py` — registro del acuse de divulgación con marca de tiempo y versión, acuse específico de degradación, y regla de conclusión de la primera ejecución (acuse + generación resuelta + `email_step_status <> 'pending'`) (FR-002, FR-007.3, FR-015)
-- [ ] T053 [P] [US1] `backend/app/domain/disclosure.py` — texto de divulgación **versionado** con los cuatro puntos obligatorios de FR-001 (qué se queda, la única excepción con detalle de qué y cuándo, cero telemetría, archivos sin cifrar); test de que cambiar el texto exige una versión nueva y que un acuse de versión anterior no cubre a la vigente (research R-29, FR-048)
+- [X] T048 [P] [US1] `backend/app/domain/setup.py` — `pending_step` **derivado por reglas** (`disclosure` → `providers` → `email` → `null`), nunca persistido como puntero; tests exhaustivos de las cuatro ramas en `backend/tests/unit/test_setup_pending_step.py` (research R-18, FR-014)
+- [X] T049 [P] [US1] `backend/app/db/repositories/{setup_state_repository,provider_configuration_repository}.py` con `candidate_id` explícito; test con **dos** `candidate_id` en `backend/tests/integration/test_setup_repository_scoping.py`
+- [X] T050 [US1] `backend/app/services/preflight_service.py` — ejecuta el preflight **al guardar cada credencial**, nunca diferido; **único intérprete** de los cuatro resultados; calcula el `credential_fingerprint` (HMAC-SHA256 truncado con clave derivada local, `hmac` de la estándar) y **invalida la fila cuando la credencial cambia** (research R-23, R-24, SC-012)
+- [X] T051 [US1] `backend/app/services/provider_catalog_service.py` — catálogo ofrecible = matriz filtrada por `verified_on is not None` y por capacidad, más el costo estimado de `pricing.py`; **el frontend no ramifica por proveedor**, renderiza lo que este servicio devuelve (art. XI)
+- [X] T052 [US1] `backend/app/services/setup_service.py` — registro del acuse de divulgación con marca de tiempo y versión, acuse específico de degradación, y regla de conclusión de la primera ejecución (acuse + generación resuelta + `email_step_status <> 'pending'`) (FR-002, FR-007.3, FR-015)
+- [X] T053 [P] [US1] `backend/app/domain/disclosure.py` — texto de divulgación **versionado** con los cuatro puntos obligatorios de FR-001 (qué se queda, la única excepción con detalle de qué y cuándo, cero telemetría, archivos sin cifrar); test de que cambiar el texto exige una versión nueva y que un acuse de versión anterior no cubre a la vigente (research R-29, FR-048)
 
 ### Vinculación de correo opcional (escribir el test de cumplimiento primero)
 
-- [ ] T054 [P] [US1] Escribir antes: `backend/app/adapters/email/base.py` con `EmailPort` y el **test de cumplimiento** `backend/tests/unit/test_email_label_scoping.py`, que verifica que **ninguna** consulta IMAP sale sin restricción de etiqueta, marcado con `@pytest.mark.xfail(strict=True, reason="verde en T055")`. Es un test de cumplimiento del ADR-012, no de funcionalidad
-- [ ] T055 [US1] `backend/app/adapters/email/gmail_imap.py` — App Password + IMAP (`imaplib` de la estándar), acotado a la etiqueta designada, limitado en 001 a **verificar que la etiqueta existe y es alcanzable**; sin lectura ni parseo de correos. **Quita el `xfail` de T054** (FR-013, fuera de alcance F1.3.2)
-- [ ] T056 [US1] `backend/app/services/email_link_service.py` — vincular y omitir, con traducción de fallos a `EMAIL_APP_PASSWORD_REJECTED`, `EMAIL_LABEL_NOT_FOUND` y `EMAIL_PROVIDER_UNREACHABLE`; la App Password vive en configuración local y **nunca** toca la base (FR-013)
+- [X] T054 [P] [US1] Escribir antes: `backend/app/adapters/email/base.py` con `EmailPort` y el **test de cumplimiento** `backend/tests/unit/test_email_label_scoping.py`, que verifica que **ninguna** consulta IMAP sale sin restricción de etiqueta, marcado con `@pytest.mark.xfail(strict=True, reason="verde en T055")`. Es un test de cumplimiento del ADR-012, no de funcionalidad
+- [X] T055 [US1] `backend/app/adapters/email/gmail_imap.py` — App Password + IMAP (`imaplib` de la estándar), acotado a la etiqueta designada, limitado en 001 a **verificar que la etiqueta existe y es alcanzable**; sin lectura ni parseo de correos. **Quita el `xfail` de T054** (FR-013, fuera de alcance F1.3.2)
+- [X] T056 [US1] `backend/app/services/email_link_service.py` — vincular y omitir, con traducción de fallos a `EMAIL_APP_PASSWORD_REJECTED`, `EMAIL_LABEL_NOT_FOUND` y `EMAIL_PROVIDER_UNREACHABLE`; la App Password vive en configuración local y **nunca** toca la base (FR-013)
 
 ### Endpoints de la primera ejecución (contract tests primero)
 
-- [ ] T057 [US1] Escribir antes, con `xfail(strict=True)` por test apuntando a su tarea (`T058` divulgación, `T059` proveedores, `T060` correo): contract tests de los nueve endpoints de `/setup/*` en `backend/tests/integration/test_setup_endpoints.py`, verificados contra `contracts/openapi.yaml` (esquemas `SetupState`, `Disclosure`, `ProviderCatalog`, `PreflightOutcome`, `ProviderConfiguration`, `EmailStep`)
-- [ ] T058 [US1] `backend/app/api/v1/setup.py` — divulgación: `GET /setup/state` (con `pending_step` derivado), `GET /setup/disclosure`, `POST /setup/disclosure-acknowledgement`. Quita los `xfail` correspondientes de T057
-- [ ] T059 [US1] `backend/app/api/v1/setup.py` — proveedores: `GET /setup/providers/catalog`, `GET` y `PUT /setup/providers/{capability}`, `POST /setup/providers/{capability}/degradation-acknowledgement`. Ninguna respuesta expone la credencial: el estado consultable es exactamente `configured | not_configured | rejected`. Quita los `xfail` correspondientes de T057
-- [ ] T060 [US1] `backend/app/api/v1/setup.py` — correo: `GET /setup/email`, `POST /setup/email/link`, `POST /setup/email/skip`. Quita los `xfail` correspondientes de T057
-- [ ] T061 [P] [US1] Los diez códigos de error de primera ejecución de `contracts/errors.md` en `backend/app/domain/errors.py` y su mapeo en `backend/app/api/errors.py`, con test de que ningún mensaje incluye la llave, un fragmento suyo ni una traza técnica
+- [X] T057 [US1] Escribir antes, con `xfail(strict=True)` por test apuntando a su tarea (`T058` divulgación, `T059` proveedores, `T060` correo): contract tests de los nueve endpoints de `/setup/*` en `backend/tests/integration/test_setup_endpoints.py`, verificados contra `contracts/openapi.yaml` (esquemas `SetupState`, `Disclosure`, `ProviderCatalog`, `PreflightOutcome`, `ProviderConfiguration`, `EmailStep`)
+- [X] T058 [US1] `backend/app/api/v1/setup.py` — divulgación: `GET /setup/state` (con `pending_step` derivado), `GET /setup/disclosure`, `POST /setup/disclosure-acknowledgement`. Quita los `xfail` correspondientes de T057
+- [X] T059 [US1] `backend/app/api/v1/setup.py` — proveedores: `GET /setup/providers/catalog`, `GET` y `PUT /setup/providers/{capability}`, `POST /setup/providers/{capability}/degradation-acknowledgement`. Ninguna respuesta expone la credencial: el estado consultable es exactamente `configured | not_configured | rejected`. Quita los `xfail` correspondientes de T057
+- [X] T060 [US1] `backend/app/api/v1/setup.py` — correo: `GET /setup/email`, `POST /setup/email/link`, `POST /setup/email/skip`. Quita los `xfail` correspondientes de T057
+- [X] T061 [P] [US1] Los diez códigos de error de primera ejecución de `contracts/errors.md` en `backend/app/domain/errors.py` y su mapeo en `backend/app/api/errors.py`, con test de que ningún mensaje incluye la llave, un fragmento suyo ni una traza técnica
 
 ### Tests de integración de US1
 
-- [ ] T062 [P] [US1] `backend/tests/integration/test_preflight_outcomes.py` — cada una de las cuatro variantes con su mensaje y su efecto: rechazada no avanza, cuota agotada **no** se presenta como llave inválida, sin garantía exige acuse y enumera `affected_features`, verificada registra `embedding_dim`; más `provider_unreachable` como caso distinto (SC-012, SC-016)
-- [ ] T063 [P] [US1] `backend/tests/integration/test_setup_resume.py` — con acuse hecho y solo generación verificada, `pending_step` es `providers` para embeddings y no se vuelve a pedir el acuse ni la llave verificada (SC-015, US1 AC12)
-- [ ] T064 [P] [US1] `backend/tests/integration/test_no_credentials_leak.py` — recorre una ejecución completa con los cuatro resultados y verifica **0 apariciones** de la llave o fragmentos en logs, trazas, mensajes de error, respuestas de la API y **cualquier** tabla de la base (SC-013)
-- [ ] T065 [P] [US1] `backend/tests/integration/test_credential_rotation.py` — rotar la credencial invalida el preflight **solo de esa capacidad**; el acuse y la otra capacidad sobreviven (research R-24)
+- [X] T062 [P] [US1] `backend/tests/integration/test_preflight_outcomes.py` — cada una de las cuatro variantes con su mensaje y su efecto: rechazada no avanza, cuota agotada **no** se presenta como llave inválida, sin garantía exige acuse y enumera `affected_features`, verificada registra `embedding_dim`; más `provider_unreachable` como caso distinto (SC-012, SC-016)
+- [X] T063 [P] [US1] `backend/tests/integration/test_setup_resume.py` — con acuse hecho y solo generación verificada, `pending_step` es `providers` para embeddings y no se vuelve a pedir el acuse ni la llave verificada (SC-015, US1 AC12)
+- [X] T064 [P] [US1] `backend/tests/integration/test_no_credentials_leak.py` — recorre una ejecución completa con los cuatro resultados y verifica **0 apariciones** de la llave o fragmentos en logs, trazas, mensajes de error, respuestas de la API y **cualquier** tabla de la base (SC-013)
+- [X] T065 [P] [US1] `backend/tests/integration/test_credential_rotation.py` — rotar la credencial invalida el preflight **solo de esa capacidad**; el acuse y la otra capacidad sobreviven (research R-24)
 
 ### Frontend del wizard
 
-- [ ] T066 [US1] Regenerar `frontend/openapi.json` y `frontend/src/api/schema.d.ts`; guard de primera ejecución en `frontend/src/routes/` que impide alcanzar `/onboarding` mientras `pending_step` no sea `null` (FR-002, FR-010)
-- [ ] T067 [P] [US1] `frontend/src/features/setup/disclosure/` — texto **completo en pantalla** sin ningún campo que llenar, acuse **nunca preseleccionado**, botón de continuar inhabilitado sin él; test RTL en `frontend/tests/setup/disclosure.test.tsx` (FR-001, FR-002, US1 AC1–AC2)
-- [ ] T068 [P] [US1] `frontend/src/features/setup/providers/` — dos configuraciones separadas con la razón de la separación en una línea, costo estimado de cada una **antes** de pedir ninguna llave, y una sola llave cuando el proveedor es el mismo; test RTL (FR-004, FR-005, US1 AC3–AC4)
-- [ ] T069 [P] [US1] `frontend/src/features/setup/providers/PreflightResult.tsx` — los cuatro resultados diferenciados y el acuse específico de degradación mostrando `affected_features`; test RTL de que sin acuse no se puede avanzar (FR-007, SC-016)
-- [ ] T070 [P] [US1] `frontend/src/features/setup/email/` — omitir con **el mismo peso visual** que continuar, qué se gana y qué **no** se pierde, y la divulgación de la App Password **antes** de pedir nada; test RTL (FR-011, FR-012, US1 AC9–AC10)
-- [ ] T071 [US1] `frontend/src/features/setup/hooks/` — queries y mutaciones de TanStack Query para el estado del wizard, con navegación automática al `pending_step` al reabrir (FR-014)
+- [X] T066 [US1] Regenerar `frontend/openapi.json` y `frontend/src/api/schema.d.ts`; guard de primera ejecución en `frontend/src/routes/` que impide alcanzar `/onboarding` mientras `pending_step` no sea `null` (FR-002, FR-010)
+
+  > **Alcance ampliado respecto de lo escrito.** «Regenerar» era un no-op: el
+  > esquema ya estaba sincronizado desde T060. Lo que no estaba sincronizado era
+  > el contrato con la realidad — `contracts/openapi.yaml` declara `Error` en
+  > cada respuesta de error de cada endpoint, la implementación no declaraba
+  > ninguna, y el esquema generado anunciaba `HTTPValidationError` en los 422,
+  > un cuerpo que la aplicación nunca devuelve porque el handler responde
+  > `VALIDATION_ERROR`. Sin cerrar ese hueco, el frontend tendría que escribir a
+  > mano el tipo del error para poder ramificar por `code`, que es justo lo que
+  > el art. I prohíbe y lo que el control de drift de CI no ve. T066 añade por
+  > tanto: `ErrorCode` como conjunto cerrado, `ValidationFailedError` en la
+  > jerarquía, el esquema publicado como `Error`, la declaración en los diez
+  > endpoints y `tests/unit/test_error_contract.py`.
+- [X] T067 [P] [US1] `frontend/src/features/setup/disclosure/` — texto **completo en pantalla** sin ningún campo que llenar, acuse **nunca preseleccionado**, botón de continuar inhabilitado sin él; test RTL en `frontend/tests/setup/disclosure.test.tsx` (FR-001, FR-002, US1 AC1–AC2)
+- [X] T068 [P] [US1] `frontend/src/features/setup/providers/` — dos configuraciones separadas con la razón de la separación en una línea, costo estimado de cada una **antes** de pedir ninguna llave, y una sola llave cuando el proveedor es el mismo; test RTL (FR-004, FR-005, US1 AC3–AC4)
+- [X] T069 [P] [US1] `frontend/src/features/setup/providers/PreflightResult.tsx` — los cuatro resultados diferenciados y el acuse específico de degradación mostrando `affected_features`; test RTL de que sin acuse no se puede avanzar (FR-007, SC-016)
+- [X] T070 [P] [US1] `frontend/src/features/setup/email/` — omitir con **el mismo peso visual** que continuar, qué se gana y qué **no** se pierde, y la divulgación de la App Password **antes** de pedir nada; test RTL (FR-011, FR-012, US1 AC9–AC10)
+- [X] T071 [US1] `frontend/src/features/setup/hooks/` — queries y mutaciones de TanStack Query para el estado del wizard, con navegación automática al `pending_step` al reabrir (FR-014)
 
 ---
 
@@ -241,14 +254,22 @@ cd backend && uv run pytest tests/unit tests/integration tests/architecture -q
 cd ../frontend && npm run test && npm run build
 ```
 
-- [ ] Recorrido manual completo de **quickstart §3, pasos 1 a 15**, sobre instalación limpia: `git clone` → `docker compose up` → divulgación → proveedores → correo → **"listo para subir CV"**, sin editar ni un archivo a mano
-- [ ] `POST /documents` con curl y sin acuse responde `409 DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED`: el gate es **de servidor**, no del guard de la SPA
-- [ ] Los cuatro resultados de preflight se distinguen; la degradación enumera funciones afectadas y exige acuse
-- [ ] Omitir embeddings **no** bloquea el onboarding (FR-010); omitir correo tampoco (FR-011)
-- [ ] Cerrar el navegador a mitad y volver retoma en el paso pendiente sin re-pedir acuse ni llaves
-- [ ] `test_no_credentials_leak.py` en verde: cero credenciales en cualquier superficie
-- [ ] El test de arquitectura del art. XI pasa; ningún nombre de proveedor fuera de `adapters/llm/`
-- [ ] **Cero marcas `xfail` vivas** en la suite: `uv run pytest -q -rx` no reporta xfails pendientes del bloque B
+- [ ] Recorrido manual completo de **quickstart §3, pasos 1 a 15**, sobre instalación limpia: `git clone` → `docker compose up` → divulgación → proveedores → correo → **"listo para subir CV"**, sin editar ni un archivo a mano — **pendiente: exige API keys reales, red y Docker; no es automatizable aquí**
+- [X] El gate de la divulgación es **de servidor**, no del guard de la SPA: `tests/integration/test_server_side_disclosure_gate.py` monta una ruta protegida por `require_disclosure_acknowledgement()` y verifica sobre HTTP real que sin acuse responde `409 DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED`, con el cuerpo que declara `contracts/openapi.yaml`
+
+  > **Por qué se desdobló, y no se relajó.** El bullet original nombraba `POST
+  > /documents`, que es **T086** (bloque C2): pedirlo como condición de salida
+  > del checkpoint B era una contradicción de este mismo archivo. El gate ya
+  > existía como función probada y sin ningún llamador, que es la peor forma de
+  > tenerlo — nadie lo había visto rechazar una petición. Este bullet lo ejerce
+  > ahora sobre HTTP real; el original vuelve **íntegro** al Checkpoint C, con
+  > la ruta real y con curl, que es donde SC-011 termina de verificarse.
+- [X] Los cuatro resultados de preflight se distinguen; la degradación enumera funciones afectadas y exige acuse — `tests/setup/preflight-result.test.tsx` (los cinco casos, con `provider_unreachable` aparte) y `tests/setup/providers.test.tsx`; en backend, `tests/integration/test_preflight_outcomes.py`
+- [X] Omitir embeddings **no** bloquea el onboarding (FR-010); omitir correo tampoco (FR-011) — `tests/setup/guard.test.tsx` (se llega al correo con embeddings sin resolver) y `tests/setup/providers.test.tsx` (se continúa con generación resuelta y embeddings nula)
+- [X] Cerrar el navegador a mitad y volver retoma en el paso pendiente sin re-pedir acuse ni llaves — `tests/setup/hooks.test.tsx`, que lo comprueba sobre las peticiones hechas y no sobre lo que se dibuja; en backend, `tests/integration/test_setup_resume.py`
+- [X] `test_no_credentials_leak.py` en verde: cero credenciales en cualquier superficie — 5 tests; además el frontend verifica que ni la API key ni la App Password quedan en el DOM
+- [X] El test de arquitectura del art. XI pasa; ningún nombre de proveedor fuera de `adapters/llm/` — 6 tests; verificado además que `frontend/src/` no contiene ningún nombre de proveedor, y los fixtures de los tests usan identificadores inventados a propósito
+- [X] **Cero marcas `xfail` vivas** en la suite: `uv run pytest -q -rx` no reporta ninguno — 509 passed, sin xfail ni xpass
 
 ---
 
@@ -373,6 +394,7 @@ cd ../frontend && npm run test && npm run build
 ## ✅ CHECKPOINT C — Onboarding
 
 - [ ] Recorrido manual completo de **quickstart §4** (subida → revisión → objetivos → confirmación → versión 2)
+- [ ] `POST /documents` con curl y sin acuse responde `409 DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED`: el gate es **de servidor**, no del guard de la SPA (SC-011; bullet trasladado desde el Checkpoint B, donde la ruta todavía no existía)
 - [ ] Todos los recorridos de rechazo de **quickstart §5** con su código y cero entradas creadas
 - [ ] Captura manual guiada llega a `complete` sin haber sembrado desde archivo (SC-010)
 - [ ] Reintento tras fallo conserva las entradas manuales y no duplica las sembradas (FR-023)
@@ -455,8 +477,8 @@ Los **checkpoints siguen siendo tres**. Un sub-bloque cierra con reporte y aprob
 | Sub-bloque | Tareas | Contenido | Cierra con |
 |---|---|---|---|
 | **A** | T001–T037 | Monorepo, tooling, Compose local, migración inicial, contrato tipado E2E, CI | **Checkpoint A** ✅ |
-| **B1** | T038–T047 | Puertos del LLM, matriz de capacidades, costo estimado, esquemas de preflight, adapter Google, factory y trazado | Reporte + diff |
-| **B2** | T048–T065 | Dominio del wizard, repositorios, servicios de preflight, catálogo y correo, endpoints `/setup/*`, tests de integración de US1 | Reporte + diff |
+| **B1** ✅ | T038–T047 | Puertos del LLM, matriz de capacidades, costo estimado, esquemas de preflight, adapter Google, factory y trazado | Reporte + diff |
+| **B2** ✅ | T048–T065 | Dominio del wizard, repositorios, servicios de preflight, catálogo y correo, endpoints `/setup/*`, tests de integración de US1 | Reporte + diff |
 | **B3** | T066–T071 | Frontend del wizard | **Checkpoint B** |
 | **C1** | T072–T077 | Dominio de entradas y completitud, storage y extracción de texto | Reporte + diff |
 | **C2** | T078–T090 | Prompts, pipeline determinista, repositorios y endpoints de US2 | Reporte + diff |

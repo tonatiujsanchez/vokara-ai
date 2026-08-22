@@ -1,6 +1,369 @@
 {
   "components": {
     "schemas": {
+      "AffectedFeatureModel": {
+        "description": "A concrete function lost to a degradation, never a generic warning.",
+        "properties": {
+          "code": {
+            "description": "Identificador estable en inglés de la función afectada.",
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "description": "Qué deja de funcionar y por qué, en español.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "AffectedFeatureModel",
+        "type": "object"
+      },
+      "Capability": {
+        "description": "What Vokara needs from a provider, configured independently (ADR-011).",
+        "enum": [
+          "generation",
+          "embeddings"
+        ],
+        "title": "Capability",
+        "type": "string"
+      },
+      "CredentialStatus": {
+        "description": "Everything the API may ever say about a credential (FR-008, SC-013).\n\nThree values and no fourth. Not the key, not the last four characters, not a\nlength: «ni siquiera parcialmente» is the wording of the requirement, and a\nclosed enum is what makes it impossible to answer with anything else.",
+        "enum": [
+          "configured",
+          "not_configured",
+          "rejected"
+        ],
+        "title": "CredentialStatus",
+        "type": "string"
+      },
+      "DisclosureAcknowledgementRequest": {
+        "description": "`acknowledged` is `True` and nothing else: continuing is not accepting.",
+        "properties": {
+          "acknowledged": {
+            "const": true,
+            "description": "Acuse explícito y afirmativo. NUNCA preseleccionado, NUNCA inferido (FR-002).",
+            "title": "Acknowledged",
+            "type": "boolean"
+          },
+          "disclosure_version": {
+            "title": "Disclosure Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "disclosure_version",
+          "acknowledged"
+        ],
+        "title": "DisclosureAcknowledgementRequest",
+        "type": "object"
+      },
+      "DisclosureModel": {
+        "description": "The full text of the disclosure of art. V, to be shown on screen.",
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "boolean"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Versión efectivamente acusada; un acuse viejo no cubre un texto nuevo.",
+            "title": "Acknowledged Version"
+          },
+          "body_md": {
+            "description": "Texto completo en español. Nunca solo un enlace.",
+            "title": "Body Md",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "body_md",
+          "acknowledged"
+        ],
+        "title": "DisclosureModel",
+        "type": "object"
+      },
+      "EmailLinkRequest": {
+        "description": "The App Password travels in the body, is used once and never returned.",
+        "properties": {
+          "app_password": {
+            "description": "Write-only; jamás se devuelve.",
+            "format": "password",
+            "title": "App Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "email_address": {
+            "title": "Email Address",
+            "type": "string"
+          },
+          "label": {
+            "description": "Etiqueta de Gmail a la que Vokara restringe cada consulta.",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email_address",
+          "app_password",
+          "label"
+        ],
+        "title": "EmailLinkRequest",
+        "type": "object"
+      },
+      "EmailStepModel": {
+        "description": "The optional step, with everything needed to decide (FR-011, FR-012).",
+        "properties": {
+          "configuration_notice_es": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Notice Es"
+          },
+          "credential_status": {
+            "$ref": "#/components/schemas/CredentialStatus"
+          },
+          "disclosure_md": {
+            "description": "Divulgación obligatoria PREVIA a pedir credencial alguna (FR-012).",
+            "title": "Disclosure Md",
+            "type": "string"
+          },
+          "is_skippable": {
+            "const": true,
+            "default": true,
+            "description": "Siempre verdadero (FR-011): omitir tiene el mismo peso que continuar.",
+            "title": "Is Skippable",
+            "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Etiqueta designada. Nunca la credencial.",
+            "title": "Label"
+          },
+          "linked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linked At"
+          },
+          "oauth_docs_url": {
+            "description": "Vía alternativa para cuentas sin App Passwords.",
+            "title": "Oauth Docs Url",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EmailStepStatus"
+          },
+          "value_if_linked_es": {
+            "description": "Qué se gana vinculando.",
+            "title": "Value If Linked Es",
+            "type": "string"
+          },
+          "value_if_skipped_es": {
+            "description": "Qué NO se pierde al omitirlo.",
+            "title": "Value If Skipped Es",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "disclosure_md",
+          "oauth_docs_url",
+          "credential_status",
+          "value_if_linked_es",
+          "value_if_skipped_es"
+        ],
+        "title": "EmailStepModel",
+        "type": "object"
+      },
+      "EmailStepStatus": {
+        "description": "The optional step: pending until the candidate links **or** skips it.",
+        "enum": [
+          "pending",
+          "linked",
+          "skipped"
+        ],
+        "title": "EmailStepStatus",
+        "type": "string"
+      },
+      "Error": {
+        "description": "The only error body the API returns.\n\nNamed after the schema of `contracts/openapi.yaml`, because the component\nkey OpenAPI publishes is this class's name: calling it anything else would\nput a second name for the same thing in the generated client. It is the\nerror *body*; the exception that produces it is `DomainError`.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "Identificador estable en inglés del error. Conjunto cerrado: el frontend ramifica sobre él y no puede ramificar sobre uno inexistente."
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Datos estructurados del error: campos inválidos, bloqueadores, límites.",
+            "title": "Details"
+          },
+          "message": {
+            "description": "Texto accionable en español, resuelto por el backend.",
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "description": "Every code the API can put in an error body. Closed on purpose.\n\n`contracts/errors.md` says the frontend depends on `code` and on nothing\nelse to decide behaviour. A `str` would let it branch on a code that no\nlonger exists — a rename in this module and the SPA keeps compiling against\nthe old spelling, silently taking the wrong branch. As a closed enum the\ncode reaches `schema.d.ts` as a union of literals, so that same rename stops\nthe frontend build instead (art. I).\n\nEvery member has exactly one `DomainError` below, and\n`tests/unit/test_error_contract.py` fails when that stops being true.",
+        "enum": [
+          "INTERNAL_ERROR",
+          "VALIDATION_ERROR",
+          "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED",
+          "DISCLOSURE_ALREADY_ACKNOWLEDGED",
+          "PROVIDER_CREDENTIAL_REJECTED",
+          "PROVIDER_QUOTA_EXCEEDED",
+          "PROVIDER_UNREACHABLE",
+          "MODEL_NOT_AVAILABLE",
+          "PROVIDER_NOT_OFFERED",
+          "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED",
+          "GENERATION_PROVIDER_REQUIRED",
+          "EMAIL_APP_PASSWORD_REJECTED",
+          "EMAIL_LABEL_NOT_FOUND",
+          "EMAIL_PROVIDER_UNREACHABLE"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "EstimatedCostModel": {
+        "description": "Cost per month of active search, shown before the key is asked for.",
+        "properties": {
+          "amount_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`null` mientras el cálculo esté pendiente.",
+            "title": "Amount Usd"
+          },
+          "currency": {
+            "const": "USD",
+            "default": "USD",
+            "title": "Currency",
+            "type": "string"
+          },
+          "free_tier_note_es": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Tier Note Es"
+          },
+          "has_free_tier": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Free Tier"
+          },
+          "is_estimated": {
+            "description": "Falso mientras no haya cifra: la ausencia se dice, no se inventa.",
+            "title": "Is Estimated",
+            "type": "boolean"
+          },
+          "pending_note_es": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Note Es"
+          },
+          "usage_assumption_es": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "El supuesto de uso que produce la cifra, para que sea interpretable.",
+            "title": "Usage Assumption Es"
+          }
+        },
+        "required": [
+          "is_estimated"
+        ],
+        "title": "EstimatedCostModel",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
           "database": {
@@ -32,6 +395,328 @@
         ],
         "title": "HealthResponse",
         "type": "object"
+      },
+      "PreflightOutcomeModel": {
+        "description": "One preflight result. Carries no key and no technical trace (FR-007).",
+        "properties": {
+          "affected_features": {
+            "description": "Funciones concretas afectadas. No vacío cuando el resultado es `capability_unverified`.",
+            "items": {
+              "$ref": "#/components/schemas/AffectedFeatureModel"
+            },
+            "title": "Affected Features",
+            "type": "array"
+          },
+          "checked_at": {
+            "description": "Cuándo se verificó, no cuándo se guardó.",
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "degradation_reasons": {
+            "description": "POR QUÉ no se dio por verificada la capacidad, en español y observado en el preflight: qué campo inventó el modelo, o que la respuesta no tenía la estructura pedida. FR-007.3 exige enumerar las funciones afectadas «y por qué»; `affected_features` es lo primero y esto lo segundo. NUNCA una traza técnica ni el texto crudo del proveedor.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Degradation Reasons",
+            "type": "array"
+          },
+          "embedding_dim": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dimensión verificada del vector; presente cuando `embeddings` quedó verificado.",
+            "title": "Embedding Dim"
+          },
+          "message": {
+            "description": "Mensaje accionable en español.",
+            "title": "Message",
+            "type": "string"
+          },
+          "result": {
+            "description": "`verified`, `capability_unverified`, `credential_rejected` o `quota_exceeded`.",
+            "title": "Result",
+            "type": "string"
+          }
+        },
+        "required": [
+          "result",
+          "checked_at",
+          "message"
+        ],
+        "title": "PreflightOutcomeModel",
+        "type": "object"
+      },
+      "ProviderCatalogModel": {
+        "description": "Two closed lists, because they are two independent choices (ADR-011).",
+        "properties": {
+          "embeddings": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOptionModel"
+            },
+            "title": "Embeddings",
+            "type": "array"
+          },
+          "generation": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOptionModel"
+            },
+            "title": "Generation",
+            "type": "array"
+          },
+          "separation_reason_es": {
+            "title": "Separation Reason Es",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generation",
+          "embeddings",
+          "separation_reason_es"
+        ],
+        "title": "ProviderCatalogModel",
+        "type": "object"
+      },
+      "ProviderConfigurationModel": {
+        "description": "The configuration of one capability, as the wizard renders it.",
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "configuration_notice_es": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aviso de configuración: se emite cuando la misma credencial también está definida en el entorno y Vokara usará la del asistente.",
+            "title": "Configuration Notice Es"
+          },
+          "credential_status": {
+            "$ref": "#/components/schemas/CredentialStatus",
+            "description": "Único estado consultable de una credencial. NUNCA la llave (FR-008)."
+          },
+          "degradation_acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Degradation Acknowledged At"
+          },
+          "is_usable": {
+            "description": "Derivado: verificada, o sin garantía CON acuse. Es el gate de FR-010.",
+            "title": "Is Usable",
+            "type": "boolean"
+          },
+          "model": {
+            "description": "Modelo efectivamente verificado.",
+            "title": "Model",
+            "type": "string"
+          },
+          "preflight": {
+            "$ref": "#/components/schemas/PreflightOutcomeModel"
+          },
+          "provider": {
+            "description": "Identificador del catálogo cerrado.",
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "provider",
+          "model",
+          "credential_status",
+          "preflight",
+          "is_usable"
+        ],
+        "title": "ProviderConfigurationModel",
+        "type": "object"
+      },
+      "ProviderCredentialRequest": {
+        "description": "The key travels in the body, is used for the preflight and is never returned.",
+        "properties": {
+          "api_key": {
+            "description": "Credencial del usuario. Write-only; jamás se devuelve.",
+            "format": "password",
+            "title": "Api Key",
+            "type": "string",
+            "writeOnly": true
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Opcional. Sin él se usa el modelo por defecto de la configuración.",
+            "title": "Model"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "api_key"
+        ],
+        "title": "ProviderCredentialRequest",
+        "type": "object"
+      },
+      "ProviderOptionModel": {
+        "description": "One offerable option. Only appears if its verification is on record.",
+        "properties": {
+          "credential_url": {
+            "description": "Dónde se obtiene la llave.",
+            "title": "Credential Url",
+            "type": "string"
+          },
+          "default_model": {
+            "description": "De configuración, nunca de una constante.",
+            "title": "Default Model",
+            "type": "string"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "embedding_dim": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Dim"
+          },
+          "estimated_cost": {
+            "$ref": "#/components/schemas/EstimatedCostModel"
+          },
+          "is_suggested_default": {
+            "title": "Is Suggested Default",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "display_name",
+          "is_suggested_default",
+          "credential_url",
+          "default_model",
+          "estimated_cost"
+        ],
+        "title": "ProviderOptionModel",
+        "type": "object"
+      },
+      "ProvidersModel": {
+        "description": "Both capabilities, `null` where nothing has been configured.",
+        "properties": {
+          "embeddings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderConfigurationModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "generation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderConfigurationModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ProvidersModel",
+        "type": "object"
+      },
+      "SetupStateModel": {
+        "description": "The facts of the first run, and the two values derived from them.",
+        "properties": {
+          "disclosure_acknowledged": {
+            "title": "Disclosure Acknowledged",
+            "type": "boolean"
+          },
+          "disclosure_acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disclosure Acknowledged At"
+          },
+          "email_status": {
+            "$ref": "#/components/schemas/EmailStepStatus"
+          },
+          "is_complete": {
+            "title": "Is Complete",
+            "type": "boolean"
+          },
+          "pending_step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupStep"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`null` ⇔ la primera ejecución concluyó y no vuelve a mostrarse."
+          },
+          "providers": {
+            "$ref": "#/components/schemas/ProvidersModel"
+          }
+        },
+        "required": [
+          "disclosure_acknowledged",
+          "providers",
+          "email_status",
+          "is_complete"
+        ],
+        "title": "SetupStateModel",
+        "type": "object"
+      },
+      "SetupStep": {
+        "description": "The step the wizard resumes at. Derived, never stored.",
+        "enum": [
+          "disclosure",
+          "providers",
+          "email"
+        ],
+        "title": "SetupStep",
+        "type": "string"
       }
     }
   },
@@ -55,11 +740,527 @@
               }
             },
             "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
           }
         },
         "summary": "Estado de la instancia local",
         "tags": [
           "health"
+        ]
+      }
+    },
+    "/api/v1/setup/disclosure": {
+      "get": {
+        "description": "The complete text: art. V forbids it being only a link or only the README.",
+        "operationId": "get_disclosure_api_v1_setup_disclosure_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisclosureModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Texto vigente de la divulgación y estado de su acuse",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/disclosure-acknowledgement": {
+      "post": {
+        "description": "Recorded with its timestamp and the version accepted (FR-002, R-29).",
+        "operationId": "post_disclosure_acknowledgement_api_v1_setup_disclosure_acknowledgement_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisclosureAcknowledgementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStateModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "DISCLOSURE_ACKNOWLEDGEMENT_REQUIRED · DISCLOSURE_ALREADY_ACKNOWLEDGED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Registra el acuse explícito de la divulgación",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/email": {
+      "get": {
+        "description": "Carries the disclosure with it, because FR-012 requires it **before**.\n\nA warning that arrives after the form has been filled in is not a warning.",
+        "operationId": "get_email_step_api_v1_setup_email_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailStepModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Estado del paso de correo",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/email/link": {
+      "post": {
+        "description": "Verifies the label exists before taking the link as established (FR-013).\n\nIts three failures leave with their own code and none of them blocks\nanything: the step stays skippable at every point.",
+        "operationId": "post_email_link_api_v1_setup_email_link_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailStepModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "EMAIL_APP_PASSWORD_REJECTED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "EMAIL_LABEL_NOT_FOUND · VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "EMAIL_PROVIDER_UNREACHABLE"
+          }
+        },
+        "summary": "Vincula la cuenta de correo y verifica la etiqueta designada",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/email/skip": {
+      "post": {
+        "description": "One action, and the first run can conclude. A valid ending (FR-011).",
+        "operationId": "post_email_skip_api_v1_setup_email_skip_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStateModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Omite el paso de correo",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/providers/catalog": {
+      "get": {
+        "description": "The closed list, already resolved: the frontend renders, it does not branch.\n\nThe cost travels here so it can be shown **before** any key is asked for\n(FR-005), estimated separately for each capability.",
+        "operationId": "get_provider_catalog_api_v1_setup_providers_catalog_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderCatalogModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Proveedores ofrecibles por capacidad, con su costo estimado",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/providers/{capability}": {
+      "get": {
+        "description": "`null` when nothing is configured. Never the credential (FR-008).",
+        "operationId": "get_provider_configuration_api_v1_setup_providers__capability__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ProviderConfigurationModel"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Get Provider Configuration Api V1 Setup Providers  Capability  Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Configuración vigente de una capacidad",
+        "tags": [
+          "setup"
+        ]
+      },
+      "put": {
+        "description": "The preflight runs **here**, at save time, never deferred (FR-006).\n\nThe three results that do not allow progress leave through the error\ncatalogue with their own status and code, because they are three different\nsituations and the frontend has to be able to tell them apart without\nreading prose (contracts/errors.md).",
+        "operationId": "put_provider_configuration_api_v1_setup_providers__capability__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConfigurationModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "MODEL_NOT_AVAILABLE · PROVIDER_CREDENTIAL_REJECTED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "PROVIDER_NOT_OFFERED · VALIDATION_ERROR"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "PROVIDER_QUOTA_EXCEEDED"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "PROVIDER_UNREACHABLE"
+          }
+        },
+        "summary": "Configura una capacidad y ejecuta su preflight",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/providers/{capability}/degradation-acknowledgement": {
+      "post": {
+        "description": "The only way a capability without guarantee becomes usable (FR-007.3).\n\nAnswered 409 when the current preflight is not `capability_unverified`:\nthere is no degradation to acknowledge, and recording one would be a\nconsent to nothing.",
+        "operationId": "post_degradation_acknowledgement_api_v1_setup_providers__capability__degradation_acknowledgement_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConfigurationModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "DEGRADATION_ACKNOWLEDGEMENT_REQUIRED"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "VALIDATION_ERROR"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Acuse específico de una degradación explícita",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/v1/setup/state": {
+      "get": {
+        "description": "Entry point of the SPA: where the wizard resumes, derived from the facts.",
+        "operationId": "get_state_api_v1_setup_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupStateModel"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "INTERNAL_ERROR"
+          }
+        },
+        "summary": "Estado de la primera ejecución y paso pendiente",
+        "tags": [
+          "setup"
         ]
       }
     }

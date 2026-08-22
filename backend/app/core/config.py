@@ -70,6 +70,27 @@ class Settings(BaseSettings):
     # ── Credentials ────────────────────────────────────────────────────────
     # Read from local configuration, never persisted in the database and never
     # present in logs, traces, error messages or API responses (FR-008, FR-013).
+    #
+    # ONE EXCEPTION TO THE PRECEDENCE ABOVE, AND IT ONLY APPLIES HERE.
+    # For the credentials the first-run wizard captures — the API key of each
+    # capability and the Gmail App Password — the file the wizard writes
+    # (`<VOKARA_DATA_DIR>/credentials.env`) wins over the environment and over
+    # `.env`. The fields below are the FALLBACK for those three, not the winner:
+    # `adapters/llm/factory.py` and `services/email_link_service.py` resolve the
+    # effective credential through `core/credentials.py`.
+    #
+    # Why the inversion: the wizard is the user's most recent and most explicit
+    # action. If `.env` won, someone could paste a new key, see the preflight
+    # turn green and have Vokara keep calling the provider with the old one,
+    # silently — the kind of result-that-lies research R-24 exists to prevent,
+    # and the opposite of the control art. X promises. When both are present the
+    # UI says so instead of resolving it quietly (art. XI).
+    #
+    # Everything else on this class — model names, thresholds, data directory —
+    # keeps environment > .env > defaults, so overriding by environment in a
+    # container or in CI still works. Two precedences in one system is exactly
+    # the thing that gets forgotten, which is why it is written down here and in
+    # quickstart §0.
     google_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("VOKARA_GOOGLE_API_KEY", "GOOGLE_API_KEY"),
