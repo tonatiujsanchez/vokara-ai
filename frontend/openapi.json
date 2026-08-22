@@ -192,6 +192,18 @@
             ],
             "title": "Linked At"
           },
+          "linked_confirmation_es": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Confirmación de la vinculación, presente SOLO cuando `status` es `linked`. Nombra la etiqueta verificada y dice qué hace Vokara con ella hoy: es la contraparte del aviso de FR-012, que promete leer solo esa etiqueta.",
+            "title": "Linked Confirmation Es"
+          },
           "oauth_docs_url": {
             "description": "Vía alternativa para cuentas sin App Passwords.",
             "title": "Oauth Docs Url",

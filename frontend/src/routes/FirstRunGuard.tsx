@@ -79,7 +79,9 @@ function prerequisiteOf(step: SetupStep, state: SetupState): SetupStep | null {
  * query re-rendered the guard, and the screen was replaced before anyone could
  * read the result — the verified block with its vector dimension, or the
  * degradation with its reasons. FR-007 asks for four results told apart, and a
- * result nobody sees is not told apart from anything.
+ * result nobody sees is not told apart from anything. The same thing happened
+ * one step later, through the `pending_step === null` branch, to the
+ * confirmation that the designated mail label had been verified.
  *
  * Arriving at a step that is already done is a different situation: the
  * candidate typed an old address or reopened the application, and sending them
@@ -107,12 +109,21 @@ export function FirstRunGuard({ requires }: { requires: Requirement }): JSX.Elem
   const state = useSetupState();
 
   // Latched on the first render that has an answer, and never recomputed: the
-  // question is «was this step already done when we got here», and that has one
-  // answer per visit. React Router mounts a fresh guard per route, so moving to
-  // another step asks it again.
-  const satisfiedOnArrival = useRef<boolean | null>(null);
-  if (satisfiedOnArrival.current === null && state.isSuccess && requires.kind === "step") {
-    satisfiedOnArrival.current = isSatisfied(requires.step, state.data);
+  // question is «what was true when we got here», and that has one answer per
+  // visit. React Router mounts a fresh guard per route, so moving to another
+  // step asks it again.
+  //
+  // BOTH facts are latched, and the second one was the second half of this bug.
+  // `finished` is `pending_step === null`, read live it fires the moment the
+  // last step resolves — which for the mail step is the instant the link
+  // succeeds, taking the screen to the onboarding before the candidate could
+  // read whether it worked and which label was verified.
+  const arrival = useRef<{ finished: boolean; satisfied: boolean } | null>(null);
+  if (arrival.current === null && state.isSuccess && requires.kind === "step") {
+    arrival.current = {
+      finished: (state.data.pending_step ?? null) === null,
+      satisfied: isSatisfied(requires.step, state.data),
+    };
   }
 
   if (state.isPending) return <Waiting />;
@@ -124,14 +135,18 @@ export function FirstRunGuard({ requires }: { requires: Requirement }): JSX.Elem
   if (requires.kind === "complete") {
     return pending === null ? <Outlet /> : <Navigate to={stepPath(pending)} replace />;
   }
-  if (pending === null) return <Navigate to="/onboarding" replace />;
+  // The first run was ALREADY over when they arrived: a stale address or a
+  // bookmark, and FR-015 says the wizard does not show again. Finishing it
+  // *while standing here* is a different thing, and it is the screen's to act
+  // on — see the note on `isSatisfied`.
+  if (arrival.current?.finished === true) return <Navigate to="/onboarding" replace />;
 
   const { step } = requires;
   const missing = prerequisiteOf(step, state.data);
   if (missing !== null) return <Navigate to={stepPath(missing)} replace />;
 
   // Already done before they got here, and the wizard has moved on: follow it.
-  if (satisfiedOnArrival.current === true && pending !== step) {
+  if (arrival.current?.satisfied === true && pending !== null && pending !== step) {
     return <Navigate to={stepPath(pending)} replace />;
   }
 

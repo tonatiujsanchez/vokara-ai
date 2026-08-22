@@ -177,6 +177,14 @@ class EmailStepModel(BaseModel):
     )
     value_if_linked_es: str = Field(description="Qué se gana vinculando.")
     value_if_skipped_es: str = Field(description="Qué NO se pierde al omitirlo.")
+    linked_confirmation_es: str | None = Field(
+        default=None,
+        description=(
+            "Confirmación de la vinculación, presente SOLO cuando `status` es `linked`. "
+            "Nombra la etiqueta verificada y dice qué hace Vokara con ella hoy: es la "
+            "contraparte del aviso de FR-012, que promete leer solo esa etiqueta."
+        ),
+    )
     configuration_notice_es: str | None = None
 
 
@@ -283,6 +291,7 @@ def _email_model(view: EmailStepView) -> EmailStepModel:
         credential_status=view.credential_status,
         value_if_linked_es=view.value_if_linked_es,
         value_if_skipped_es=view.value_if_skipped_es,
+        linked_confirmation_es=view.linked_confirmation_es,
         configuration_notice_es=view.configuration_notice_es,
     )
 

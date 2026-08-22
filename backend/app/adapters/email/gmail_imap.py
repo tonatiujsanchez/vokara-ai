@@ -78,6 +78,21 @@ VALUE_IF_SKIPPED_ES = (
     "y confirmarlo funcionan igual. Puedes vincular tu correo más adelante."
 )
 
+# The counterpart of the warning of FR-012. Before asking for the App Password
+# Vokara says that the password opens the WHOLE mailbox and that reading only
+# the designated label is a discipline of ours, not a permission Google
+# enforces. A promise made in those terms has to come back answered: WHICH label
+# ended up designated, verified to exist and be reachable (FR-013, ADR-012).
+#
+# The second sentence is the honest half. This feature links the mailbox; it
+# reads nothing — vacancy ingestion is out of scope for 001 — and letting the
+# candidate assume otherwise would be its own quiet lie.
+LINKED_CONFIRMATION_ES = (
+    "Listo. Comprobamos que la etiqueta «{label}» existe y es alcanzable en tu cuenta: "
+    "es la única que Vokara va a leer. En esta versión todavía no lee ningún correo; "
+    "cuando empiece, será solo de esa etiqueta."
+)
+
 
 class ImapConnection(Protocol):
     """The three commands this adapter is allowed to issue, and no others."""
