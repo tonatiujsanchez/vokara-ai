@@ -154,6 +154,45 @@ UI ni en el README**: aparece cuando su fila está completa.
   deprecia un modelo no debe poder romper una instalación que el usuario no
   actualizó (ADR-009: actualizar depende de él).
 
+## Decisión diferida: selección de modelo por el usuario
+
+**Estado: diferida. No se implementa en 001.** Se registra aquí para que la
+decisión exista por escrito y no se vuelva a descubrir desde cero.
+
+La matriz de la decisión 3 y la tabla de la sección anterior verifican
+**proveedores**. La unidad real de verificación es el **modelo**:
+`gemini-3.6-flash` y `gemini-3.5-flash-lite` son del mismo proveedor y no se
+comportan igual —ese es precisamente el bug que se está corrigiendo—. Una fila
+que dice «google: salida estructurada Sí, respeta `null` Sí» es una afirmación
+sobre el modelo que se probó, no sobre el catálogo de Google, y tratarla como lo
+segundo es la clase de afirmación sin sustento que el artículo IV existe para
+impedir, aplicada a la propia matriz.
+
+Hoy el usuario **no elige modelo**: cada capacidad usa el que vive en
+configuración (`google_model`, `google_embed`) con override por variable de
+entorno (`VOKARA_GOOGLE_MODEL`, `VOKARA_GOOGLE_EMBED`). Permitir que lo elija
+desde la UI, dentro de su proveedor, exige tres cosas:
+
+1. **Cambiar el esquema de la matriz a una fila por `(proveedor, modelo)`**, con
+   `verified_on` por modelo. El identificador deja de ser el proveedor y pasa a
+   ser el par; `capabilities_of(provider)` deja de tener una respuesta única.
+2. **Verificación empírica por cada modelo ofrecible**, no por proveedor. Un
+   proveedor con tres modelos en el desplegable son tres corridas de
+   `scripts/verify_providers.py` y tres fechas que envejecen por separado.
+3. **Definir qué pasa con un modelo no verificado.** FR-009 hoy lo prohibiría
+   —lo que no está verificado no se ofrece—, así que hay exactamente dos
+   salidas: o se verifica antes de ofrecerlo, o se ofrece bajo el mismo acuse
+   explícito de degradación que ya existe para la capacidad sin garantía
+   (decisión 4, FR-007.3). No hay una tercera: ofrecerlo callando que nadie lo
+   probó es degradación silenciosa.
+
+**Por qué se difiere.** El override por variable de entorno ya cubre el caso
+avanzado: quien sabe qué modelo quiere puede fijarlo sin que Vokara le ofrezca
+un desplegable. Y ampliarlo a la UI antes de cerrar el checkpoint B mezclaría
+una corrección con una feature nueva —dos cambios con criterios de aceptación
+distintos en el mismo PR—, que es justo lo que hace irrevisable un cambio en la
+matriz de capacidades.
+
 ## Consecuencias
 
 **Positivas**
