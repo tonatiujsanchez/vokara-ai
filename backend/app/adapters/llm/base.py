@@ -60,7 +60,17 @@ class TraceContext:
 
 @runtime_checkable
 class StructuredOutputPort(Protocol):
-    """A typed answer from a model, or an error. Never free text (art. III)."""
+    """A typed answer from a model, or an error. Never free text (art. III).
+
+    **`instructions` and `prompt` are two parameters, not one string.** The
+    instruction is the rule the model must obey; the prompt is the material it
+    must obey it on. Concatenating them demotes the rule to ordinary content,
+    and the rule of this pipeline is «leave absent data absent» — precisely what
+    the preflight measures. Every provider worth supporting distinguishes a
+    system instruction from user content, so the port hands both over and lets
+    the implementation map them; flattening the distinction here would deny it
+    to all of them.
+    """
 
     async def generate[T: BaseModel](
         self,
@@ -70,6 +80,7 @@ class StructuredOutputPort(Protocol):
         purpose: Purpose,
         prompt_version: str,
         trace_context: TraceContext,
+        instructions: str | None = None,
     ) -> T: ...
 
 

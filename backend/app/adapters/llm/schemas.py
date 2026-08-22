@@ -8,11 +8,17 @@ nothing to support them — which is why ADR-011 gives it its own column in the
 matrix and why the preflight measures the same thing the pipeline measures
 (research R-05, R-23, contracts/llm-extraction.md §0).
 
-The schema is **nested and full of optionals** for the same reason. A flat
-schema reveals nothing: almost any model satisfies it. The nesting is what
-makes the test resemble the real extraction, and the defaults are what remove
-any structural pressure to fill a hole — returning `null` is a valid answer,
-and no field accepts sentinel values like "N/A" or "Desconocido".
+The schema is **nested** for the same reason. A flat schema reveals nothing:
+almost any model satisfies it. The nesting is what makes the test resemble the
+real extraction, and the optionals are what remove any structural pressure to
+fill a hole — returning `null` is a valid answer, and no field accepts sentinel
+values like "N/A" or "Desconocido".
+
+**Optional is not the default here; it is a claim about the sample.** A field is
+optional when the sample CV genuinely lacks it, and required when it contains
+it. That distinction is the measurement: making a present field optional lets a
+model drop it and take the holes with it, which is how two of the five
+expectations once passed over an empty list (see `PreflightWorkExperience`).
 """
 
 from __future__ import annotations
@@ -24,10 +30,18 @@ from pydantic import BaseModel, Field
 
 
 class PreflightWorkExperience(BaseModel):
-    """One job. Only company and role are expected to be present."""
+    """One job. Company and role are REQUIRED, and that is what makes the test bite.
 
-    company: str | None = Field(default=None, description="Nombre de la empresa.")
-    role: str | None = Field(default=None, description="Puesto ocupado.")
+    They were optional once, and it hollowed the measurement out: `_second_job`
+    matches on the company name, so a model answering `company=None` produced an
+    empty match and two of the five expectations passed **vacuously** — the
+    preflight reported «respects nulls» about a job it never found. Required
+    fields are what the sample actually contains, so demanding them costs an
+    honest model nothing and denies a careless one the empty set.
+    """
+
+    company: str = Field(description="Nombre de la empresa.")
+    role: str = Field(description="Puesto ocupado.")
     start_date: str | None = Field(
         default=None,
         description="Fecha de inicio en formato YYYY-MM. null si el texto no la menciona.",
@@ -43,7 +57,9 @@ class PreflightWorkExperience(BaseModel):
 
 
 class PreflightEducation(BaseModel):
-    institution: str | None = Field(default=None, description="Nombre de la institución.")
+    """The institution is in the sample; the degree deliberately is not."""
+
+    institution: str = Field(description="Nombre de la institución.")
     degree: str | None = Field(
         default=None,
         description="Título obtenido. null si el texto no lo menciona.",
@@ -86,14 +102,18 @@ class NullExpectation:
 
 
 def _second_job(extraction: PreflightExtraction) -> list[PreflightWorkExperience]:
+    """The job of the sample that has neither dates nor achievements.
+
+    No `None` guard, because `company` is required: a model that omits it fails
+    the parse instead of quietly emptying this list, which is the difference
+    between measuring something and measuring nothing.
+    """
     return [
-        experience
-        for experience in extraction.experiences
-        if experience.company is not None and "Soluciones" in experience.company
+        experience for experience in extraction.experiences if "Soluciones" in experience.company
     ]
 
 
-# One entry per hole of prompts/preflight_v1.INCOMPLETE_CV_SAMPLE. Each is a
+# One entry per hole of prompts/preflight_v2.INCOMPLETE_CV_SAMPLE. Each is a
 # field the sample does not contain, so any value at all is invented.
 NULL_EXPECTATIONS: tuple[NullExpectation, ...] = (
     NullExpectation(

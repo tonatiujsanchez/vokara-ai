@@ -1,17 +1,26 @@
-"""The preflight schema must make «leave it empty» a valid answer.
+"""The preflight schema must make «leave it empty» a valid answer — where the CV is empty.
 
-If any field were required, a model would have to put something there, and the
-preflight would be measuring compliance instead of honesty. These tests fix the
-property the schema exists for and check that the criterion catches an inventing
-provider (art. IV, contracts/llm-extraction.md §0).
+A field the sample CV does not contain is optional, so a model is never forced
+to invent it: that is the property the preflight exists to measure, and making
+it required would measure compliance instead of honesty.
+
+A field the sample **does** contain is required, and that is the other half.
+`company` and `role` were optional once, and it hollowed the measurement out:
+two of the five expectations look up the second job by company name, so a model
+answering `company=None` produced an empty match and both expectations passed
+over an empty list. The preflight then reported «respects nulls» about a job it
+never found — which is how it came to disagree with the empirical verification
+behind the ADR-011 row (art. IV, contracts/llm-extraction.md §0).
 """
 
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
-from app.adapters.llm.prompts.preflight_v1 import (
+from app.adapters.llm.prompts.preflight_v2 import (
     INCOMPLETE_CV_SAMPLE,
+    PREFLIGHT_INSTRUCTIONS_ES,
     PREFLIGHT_PROMPT_VERSION,
     build_preflight_prompt,
 )
@@ -23,6 +32,21 @@ from app.adapters.llm.schemas import (
     PreflightWorkExperience,
     unmet_null_expectations,
 )
+
+# Fields the sample CV does NOT contain: a model must be free to leave them out.
+OPTIONAL_BY_ABSENCE = {
+    PreflightExtraction: ("full_name", "email", "phone", "years_of_experience"),
+    PreflightWorkExperience: ("start_date", "end_date", "achievements"),
+    PreflightEducation: ("degree",),
+}
+
+# Fields the sample DOES contain, and which the expectations match on. Optional
+# here is not generosity: it is an escape hatch out of being measured.
+REQUIRED_BY_PRESENCE = {
+    PreflightExtraction: (),
+    PreflightWorkExperience: ("company", "role"),
+    PreflightEducation: ("institution",),
+}
 
 SCHEMAS = (PreflightExtraction, PreflightWorkExperience, PreflightEducation)
 
@@ -51,9 +75,25 @@ def _well_behaved() -> PreflightExtraction:
 
 
 @pytest.mark.parametrize("schema", SCHEMAS, ids=lambda schema: schema.__name__)
-def test_the_model_is_never_forced_to_fill_anything(schema: type) -> None:
-    """An empty instance validates: returning nothing is a legal answer."""
-    assert schema()
+def test_nothing_the_cv_omits_is_ever_forced(schema: type) -> None:
+    """Every hole of the sample is optional: inventing is never the only way out."""
+    fields = schema.model_fields
+    for name in OPTIONAL_BY_ABSENCE[schema]:
+        assert not fields[name].is_required(), f"{schema.__name__}.{name} forces an answer"
+
+
+@pytest.mark.parametrize("schema", SCHEMAS, ids=lambda schema: schema.__name__)
+def test_what_the_cv_does_contain_is_required(schema: type) -> None:
+    """Optional here would let a model drop the field and take the holes with it."""
+    fields = schema.model_fields
+    for name in REQUIRED_BY_PRESENCE[schema]:
+        assert fields[name].is_required(), f"{schema.__name__}.{name} can be dropped"
+
+
+def test_a_job_without_a_company_cannot_dodge_the_expectations() -> None:
+    """The regression itself: no company, no match, two expectations passing on air."""
+    with pytest.raises(ValidationError):
+        PreflightWorkExperience(role="Desarrolladora Junior")  # type: ignore[call-arg]
 
 
 def test_the_schema_is_nested_because_a_flat_one_reveals_nothing() -> None:
@@ -121,9 +161,12 @@ def test_the_sample_cv_keeps_the_holes_the_expectations_measure() -> None:
 
 def test_the_prompt_carries_its_version_and_the_sample() -> None:
     prompt = build_preflight_prompt()
-    assert PREFLIGHT_PROMPT_VERSION == "preflight_v1"
+    assert PREFLIGHT_PROMPT_VERSION == "preflight_v2"
     assert INCOMPLETE_CV_SAMPLE in prompt
-    assert "null" in prompt
+    # v2 keeps the rule OUT of the prompt: it travels as a system instruction,
+    # which is how the verification behind the ADR-011 row always sent it.
+    assert "null" in PREFLIGHT_INSTRUCTIONS_ES
+    assert PREFLIGHT_INSTRUCTIONS_ES not in prompt
 
 
 def test_the_embeddings_probe_reports_the_dimension_it_actually_got() -> None:

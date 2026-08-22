@@ -41,6 +41,10 @@ def test_generate_takes_exactly_the_arguments_of_the_contract() -> None:
         "purpose",
         "prompt_version",
         "trace_context",
+        # The rule and the material are two parameters. Concatenating them into
+        # `prompt` demotes the rule to ordinary content, and the rule of this
+        # pipeline is the one the preflight measures.
+        "instructions",
     ]
 
 

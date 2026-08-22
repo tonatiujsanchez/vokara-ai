@@ -25,7 +25,7 @@ from pydantic import SecretStr
 
 from app.adapters.llm.base import TraceContext
 from app.adapters.llm.google import GoogleStructuredOutput
-from app.adapters.llm.prompts.preflight_v1 import INCOMPLETE_CV_SAMPLE, PREFLIGHT_PROMPT_VERSION
+from app.adapters.llm.prompts.preflight_v2 import INCOMPLETE_CV_SAMPLE, PREFLIGHT_PROMPT_VERSION
 from app.adapters.llm.schemas import PreflightExtraction
 from app.adapters.llm.tracing import (
     OUTCOME_OK,

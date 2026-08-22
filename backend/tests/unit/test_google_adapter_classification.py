@@ -8,6 +8,8 @@ research R-23).
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from pydantic import BaseModel, SecretStr
 
@@ -58,6 +60,7 @@ class FakeChat:
         self.answers = answers
         self.calls = 0
         self.include_raw: bool | None = None
+        self.last_payload: str | list[dict[str, str]] | None = None
 
     def with_structured_output(
         self, schema: type[BaseModel], include_raw: bool = False
@@ -66,8 +69,8 @@ class FakeChat:
         self.include_raw = include_raw
         return self
 
-    async def ainvoke(self, prompt: str) -> object:
-        del prompt
+    async def ainvoke(self, prompt: str | list[dict[str, str]]) -> object:
+        self.last_payload = prompt
         self.calls += 1
         answer = self.answers.pop(0)
         if isinstance(answer, BaseException):
@@ -331,3 +334,44 @@ def test_no_sampling_parameter_is_ever_sent() -> None:
     assert "temperature" not in source
     assert "top_p" not in source
     assert "top_k" not in source
+
+
+def test_the_critical_rule_travels_as_a_system_turn_and_not_as_content() -> None:
+    """The divergence that made the ADR-011 row uncertifiable (art. VI).
+
+    The empirical verification behind that row always sent «si un dato NO
+    aparece… el campo DEBE quedar en null» as a system instruction. The product
+    concatenated it into the user message, so the two ran different tests on the
+    same model and only one of them was written down.
+    """
+    from app.adapters.llm.prompts.preflight_v2 import (
+        INCOMPLETE_CV_SAMPLE,
+        PREFLIGHT_INSTRUCTIONS_ES,
+    )
+
+    adapter = _generation(_honest_extraction())
+    asyncio.run(adapter.probe())
+
+    payload = adapter.fake_chat.last_payload  # type: ignore[attr-defined]
+    assert payload == [
+        {"role": "system", "content": PREFLIGHT_INSTRUCTIONS_ES},
+        {"role": "user", "content": INCOMPLETE_CV_SAMPLE},
+    ]
+
+
+def test_a_caller_with_no_rule_to_impose_sends_a_bare_prompt() -> None:
+    """No empty system turn is invented for callers that pass no instructions."""
+    adapter = _generation(_honest_extraction())
+
+    asyncio.run(
+        adapter.generate(
+            schema=PreflightExtraction,
+            prompt="solo el material",
+            purpose="extraction",
+            prompt_version="whatever_v1",
+            trace_context=TraceContext(capability=Capability.GENERATION),
+        )
+    )
+
+    assert adapter.fake_chat.last_payload == "solo el material"  # type: ignore[attr-defined]
+

@@ -7,11 +7,17 @@ applies here (FR-047).
 What this prompt asks for is not «parse this». It asks the model to leave
 absent data absent, which is the single behaviour the preflight measures
 (research R-23, ADR-011).
+
+**v2 separates the instruction from the material.** v1 concatenated them into a
+single user message, which handed the model the REGLA CRÍTICA as ordinary text
+and diverged from the empirical verification behind the ADR-011 row — that one
+always sent the rule as a system instruction. A test that does not run what the
+product runs cannot certify it (art. VI).
 """
 
 from __future__ import annotations
 
-PREFLIGHT_PROMPT_VERSION = "preflight_v1"
+PREFLIGHT_PROMPT_VERSION = "preflight_v2"
 
 PREFLIGHT_INSTRUCTIONS_ES = (
     "Extraes información de un CV a un esquema estructurado.\n"
@@ -60,5 +66,9 @@ EMBEDDINGS_PROBE_VERSION = "embeddings_probe_v1"
 
 
 def build_preflight_prompt() -> str:
-    """Instructions and sample as a single prompt, for a one-shot port call."""
-    return f"{PREFLIGHT_INSTRUCTIONS_ES}\n\n---\n{INCOMPLETE_CV_SAMPLE}"
+    """The material the model works on: the sample CV and nothing else.
+
+    The instruction travels beside it as `PREFLIGHT_INSTRUCTIONS_ES`, in the
+    `instructions` parameter of the port. Keeping them apart is the whole of v2.
+    """
+    return INCOMPLETE_CV_SAMPLE

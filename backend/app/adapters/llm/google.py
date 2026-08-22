@@ -31,9 +31,10 @@ from app.adapters.llm.base import (
     Purpose,
     TraceContext,
 )
-from app.adapters.llm.prompts.preflight_v1 import (
+from app.adapters.llm.prompts.preflight_v2 import (
     EMBEDDINGS_PROBE_TEXT,
     EMBEDDINGS_PROBE_VERSION,
+    PREFLIGHT_INSTRUCTIONS_ES,
     PREFLIGHT_PROMPT_VERSION,
     build_preflight_prompt,
 )
@@ -89,6 +90,7 @@ _STATUS_TO_FAILURE: dict[int, ProviderFailure] = {
 # provider's text may quote the key back and never reaches a log, a trace or a
 # response (art. V, FR-008).
 _REJECTED_KEY_MARKERS = ("api key", "api_key", "api-key", "credential")
+
 
 type Sleeper = Callable[[float], Awaitable[None]]
 
@@ -219,6 +221,22 @@ def _validated[T: BaseModel](answer: Any, schema: type[T]) -> T:  # noqa: ANN401
     return answer if isinstance(answer, schema) else schema.model_validate(answer)
 
 
+def _messages(instructions: str | None, prompt: str) -> str | list[dict[str, str]]:
+    """The call payload: a system turn plus a user turn, or just the user turn.
+
+    A bare string is still accepted so a caller with no rule to impose does not
+    pay for an empty system message. When there is a rule, it travels in the
+    turn models are trained to weigh most — which is where the empirical
+    verification of ADR-011 always put it.
+    """
+    if instructions is None:
+        return prompt
+    return [
+        {"role": "system", "content": instructions},
+        {"role": "user", "content": prompt},
+    ]
+
+
 def _build_chat(model: str, credential: SecretStr | None, base_url: str | None) -> Any:  # noqa: ANN401
     """Late import so the SDK is not a cost paid by every process that imports us."""
     from langchain_google_genai import ChatGoogleGenerativeAI
@@ -284,10 +302,11 @@ class GoogleStructuredOutput:
         purpose: Purpose,
         prompt_version: str,
         trace_context: TraceContext,
+        instructions: str | None = None,
     ) -> T:
         async def call() -> ProviderAnswer[T]:
             structured = self._client().with_structured_output(schema, include_raw=True)
-            return _unwrap(await structured.ainvoke(prompt), schema)
+            return _unwrap(await structured.ainvoke(_messages(instructions, prompt)), schema)
 
         return await _with_retries(
             call,
@@ -309,6 +328,7 @@ class GoogleStructuredOutput:
         try:
             extraction = await self.generate(
                 schema=PreflightExtraction,
+                instructions=PREFLIGHT_INSTRUCTIONS_ES,
                 prompt=build_preflight_prompt(),
                 purpose="preflight",
                 prompt_version=PREFLIGHT_PROMPT_VERSION,
