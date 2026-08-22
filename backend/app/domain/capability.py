@@ -37,6 +37,21 @@ class Capability(StrEnum):
             case Capability.EMBEDDINGS:
                 return "los embeddings"
 
+    @property
+    def works_es(self) -> str:
+        """«funciona» or «funcionan», to agree with `label_es` in number.
+
+        One of the two labels is plural, so a template that hardcodes the verb
+        gets it wrong half the time — «los embeddings funciona». The agreement
+        belongs next to the noun that governs it, not in whatever message
+        happens to use it: art. IX asks for Spanish, and this is Spanish.
+        """
+        match self:
+            case Capability.GENERATION:
+                return "funciona"
+            case Capability.EMBEDDINGS:
+                return "funcionan"
+
 
 @dataclass(frozen=True)
 class AffectedFeature:

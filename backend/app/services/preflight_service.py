@@ -87,7 +87,7 @@ logger = get_logger(__name__)
 # credential changed, and short enough to make clear it is not storage.
 FINGERPRINT_CHARS = 32
 
-_VERIFIED_MESSAGE = "Tu API key quedó verificada: {capability} funciona con este modelo."
+_VERIFIED_MESSAGE = "Tu API key quedó verificada: {capability} {works} con este modelo."
 _UNVERIFIED_MESSAGE = (
     "Tu API key funciona, pero este modelo no garantiza {capability}. "
     "Esto es lo que no podrás hacer:"
@@ -445,7 +445,9 @@ def _credential_status(result: str, *, credential_matches: bool) -> CredentialSt
 def _message_for_result(result: str, capability: Capability) -> str:
     match result:
         case Verified.result:
-            return _VERIFIED_MESSAGE.format(capability=capability.label_es)
+            return _VERIFIED_MESSAGE.format(
+                capability=capability.label_es, works=capability.works_es
+            )
         case CapabilityUnverified.result:
             return _UNVERIFIED_MESSAGE.format(capability=capability.label_es)
         case CredentialRejected.result:
