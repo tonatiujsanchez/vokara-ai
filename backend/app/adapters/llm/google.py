@@ -91,6 +91,23 @@ _STATUS_TO_FAILURE: dict[int, ProviderFailure] = {
 # response (art. V, FR-008).
 _REJECTED_KEY_MARKERS = ("api key", "api_key", "api-key", "credential")
 
+# THE STATUS IS NOT ALWAYS AN ATTRIBUTE. This SDK wraps a rejected key as a
+# `ChatGoogleGenerativeAIError` with no `code` and no `status_code`: the 400 and
+# the reason live only inside the message. Without this fallback the numeric
+# branch never fires, every one of these falls through to UNREACHABLE, and an
+# invalid key is reported as «no pudimos comunicarnos» — the exact confusion
+# FR-007.1 and research R-23 exist to prevent, since the candidate then retries
+# a key that will never work instead of replacing it.
+#
+# Matched on the canonical RPC status names rather than on a loose number, so a
+# stray «400» inside some other text cannot be mistaken for a status.
+_RPC_STATUS_TO_FAILURE: tuple[tuple[str, ProviderFailure], ...] = (
+    ("API_KEY_INVALID", ProviderFailure.CREDENTIAL_REJECTED),
+    ("UNAUTHENTICATED", ProviderFailure.CREDENTIAL_REJECTED),
+    ("PERMISSION_DENIED", ProviderFailure.CREDENTIAL_REJECTED),
+    ("RESOURCE_EXHAUSTED", ProviderFailure.QUOTA_EXCEEDED),
+    ("NOT_FOUND", ProviderFailure.MODEL_NOT_AVAILABLE),
+)
 
 type Sleeper = Callable[[float], Awaitable[None]]
 
@@ -131,11 +148,26 @@ def classify(error: BaseException) -> ProviderFailure:
         # 5xx is the provider having a bad day, not the user having a bad key.
         return ProviderFailure.UNREACHABLE
 
+    # No numeric status: the SDK wrapped it and only the text carries the reason.
+    text = str(error)
+    for marker, failure in _RPC_STATUS_TO_FAILURE:
+        if marker in text:
+            return failure
+    if "INVALID_ARGUMENT" in text and _mentions_the_credential(error):
+        return ProviderFailure.CREDENTIAL_REJECTED
+
     return ProviderFailure.UNREACHABLE
 
 
 def _mentions_the_credential(error: BaseException) -> bool:
-    text = str(getattr(error, "message", "") or "").lower()
+    """Whether the provider said the credential was the problem.
+
+    Reads `str(error)` and not only `.message`, because the wrapped errors of
+    this SDK have no `.message` at all — which is how «API key not valid» used
+    to arrive classified as «no pudimos comunicarnos». The text is inspected in
+    memory and never leaves: it can quote the key back (art. V, FR-008).
+    """
+    text = f"{getattr(error, 'message', '') or ''} {error}".lower()
     return any(marker in text for marker in _REJECTED_KEY_MARKERS)
 
 

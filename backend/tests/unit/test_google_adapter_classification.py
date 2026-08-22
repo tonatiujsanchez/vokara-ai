@@ -375,3 +375,49 @@ def test_a_caller_with_no_rule_to_impose_sends_a_bare_prompt() -> None:
 
     assert adapter.fake_chat.last_payload == "solo el material"  # type: ignore[attr-defined]
 
+
+class WrappedProviderError(Exception):
+    """What this SDK actually raises for a rejected key: no code, no status_code.
+
+    Shaped from a real answer observed on 2026-08-21. The status and the reason
+    exist only inside the string, so a classifier that reads attributes sees
+    nothing and falls through to «unreachable».
+    """
+
+    def __init__(self, rpc_status: str, detail: str) -> None:
+        super().__init__(
+            f"Error calling model 'a-configured-model' ({rpc_status}): 400 {rpc_status}. "
+            f"{{'error': {{'code': 400, 'message': '{detail}', 'status': '{rpc_status}'}}}}"
+        )
+
+
+def test_a_rejected_key_is_never_reported_as_a_connection_problem() -> None:
+    """R-23: «no pudimos comunicarnos» makes the candidate retry a dead key."""
+    error = WrappedProviderError(
+        "INVALID_ARGUMENT", "API key not valid. Please pass a valid API key."
+    )
+
+    assert classify(error) is ProviderFailure.CREDENTIAL_REJECTED
+
+
+@pytest.mark.parametrize(
+    ("rpc_status", "expected"),
+    [
+        ("API_KEY_INVALID", ProviderFailure.CREDENTIAL_REJECTED),
+        ("UNAUTHENTICATED", ProviderFailure.CREDENTIAL_REJECTED),
+        ("PERMISSION_DENIED", ProviderFailure.CREDENTIAL_REJECTED),
+        ("RESOURCE_EXHAUSTED", ProviderFailure.QUOTA_EXCEEDED),
+        ("NOT_FOUND", ProviderFailure.MODEL_NOT_AVAILABLE),
+    ],
+)
+def test_the_rpc_status_name_is_read_when_no_numeric_status_exists(
+    rpc_status: str, expected: ProviderFailure
+) -> None:
+    assert classify(WrappedProviderError(rpc_status, "algo pasó")) is expected
+
+
+def test_an_ambiguous_wrapped_error_still_reads_as_unreachable() -> None:
+    """Guessing «tu llave está mal» about a working key has a concrete cost."""
+    error = WrappedProviderError("INVALID_ARGUMENT", "Request contains an invalid field.")
+
+    assert classify(error) is ProviderFailure.UNREACHABLE
