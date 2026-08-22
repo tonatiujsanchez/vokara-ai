@@ -86,6 +86,16 @@ class PreflightOutcomeModel(BaseModel):
             "`capability_unverified`."
         ),
     )
+    degradation_reasons: list[str] = Field(
+        default_factory=list,
+        description=(
+            "POR QUÉ no se dio por verificada la capacidad, en español y observado "
+            "en el preflight: qué campo inventó el modelo, o que la respuesta no "
+            "tenía la estructura pedida. FR-007.3 exige enumerar las funciones "
+            "afectadas «y por qué»; `affected_features` es lo primero y esto lo "
+            "segundo. NUNCA una traza técnica ni el texto crudo del proveedor."
+        ),
+    )
 
 
 class ProviderConfigurationModel(BaseModel):
@@ -255,6 +265,7 @@ def _configuration_model(
                 AffectedFeatureModel(code=feature.code, message=feature.message_es)
                 for feature in view.preflight.affected
             ],
+            degradation_reasons=list(view.preflight.reasons_es),
         ),
         degradation_acknowledged_at=view.degradation_acknowledged_at,
         is_usable=view.is_usable,

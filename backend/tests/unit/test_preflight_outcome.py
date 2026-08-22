@@ -124,6 +124,6 @@ def test_the_degradation_enumerates_what_stops_working_before_it_is_acknowledged
     unverified = CapabilityUnverified(
         capability=Capability.EMBEDDINGS,
         model=MODEL,
-        affected_features_es=("Búsqueda semántica de vacantes",),
+        reasons_es=("Búsqueda semántica de vacantes",),
     )
-    assert unverified.affected_features_es == ("Búsqueda semántica de vacantes",)
+    assert unverified.reasons_es == ("Búsqueda semántica de vacantes",)

@@ -147,6 +147,58 @@ def test_a_capability_without_guarantee_enumerates_what_is_lost_before_asking(
     assert acknowledged["degradation_acknowledged_at"] is not None
 
 
+def test_the_reason_the_model_was_not_trusted_reaches_the_screen_and_survives_a_reload(
+    setup_client: TestClient, probes: ProbeDirector, offerable_provider: str
+) -> None:
+    """FR-007.3 asks for the affected functions «y por qué». This is the «por qué».
+
+    The probe computed these strings and the service used to drop them, so the
+    screen could only ever say what is lost — never that the model invented a
+    phone number, and never that it answered malformed. Those are different
+    problems with different fixes, and the acknowledgement is not informed while
+    they look identical.
+
+    It is asserted on the RE-READ and not only on the save because a wizard is
+    resumable (FR-014): reasons that live only in the response of the PUT are
+    gone the moment the candidate reloads before acknowledging.
+    """
+    acknowledge(setup_client)
+    invented = (
+        "El CV no trae teléfono: el campo debe quedar en null.",
+        "Los años de experiencia no están declarados: no se calculan.",
+    )
+    probes.will_answer(
+        Capability.GENERATION,
+        CapabilityUnverified(
+            capability=Capability.GENERATION, model="un-modelo", reasons_es=invented
+        ),
+    )
+
+    saved = save(setup_client, offerable_provider).json()
+    assert tuple(saved["preflight"]["degradation_reasons"]) == invented
+
+    reloaded = setup_client.get(f"{BASE}/providers/generation").json()
+    assert tuple(reloaded["preflight"]["degradation_reasons"]) == invented
+    # The two lists answer two questions and neither replaces the other.
+    assert [f["code"] for f in reloaded["preflight"]["affected_features"]] == ["CV_PARSING"]
+
+
+def test_a_verified_capability_carries_no_reasons_at_all(
+    setup_client: TestClient, probes: ProbeDirector, offerable_provider: str
+) -> None:
+    """A reason under any other result would be a degradation nobody degraded.
+
+    The database refuses it too (`reasons_only_when_unverified`), the same way
+    it refuses an acknowledgement on a result that never degraded.
+    """
+    acknowledge(setup_client)
+
+    saved = save(setup_client, offerable_provider).json()
+
+    assert saved["preflight"]["result"] == "verified"
+    assert saved["preflight"]["degradation_reasons"] == []
+
+
 def test_an_unreachable_provider_persists_nothing_and_says_so(
     setup_client: TestClient,
     probes: ProbeDirector,

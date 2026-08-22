@@ -99,13 +99,21 @@ class CapabilityUnverified:
     """FR-007.3 — valid credential, capability without guarantee.
 
     Progress is allowed **only** after a specific acknowledgement, and the
-    acknowledgement is only honest if what breaks was enumerated first: that is
-    `affected_features_es`. Silent degradation is what art. XI forbids.
+    acknowledgement is only honest if the candidate was told two different
+    things first: **what** stops working — `affected_features(capability)` — and
+    **why** this particular model was not trusted, which is `reasons_es`.
+
+    They are not interchangeable, and the field used to be misnamed
+    `affected_features_es`, which is most of the reason nobody noticed it was
+    being dropped on the way to the screen. «No podrás sembrar tu perfil desde
+    el CV» without «inventó un teléfono que el CV no trae» is half the message:
+    the candidate cannot tell an invented value from a malformed answer, and
+    those call for different decisions — change the model, or retry.
     """
 
     capability: Capability
     model: str
-    affected_features_es: tuple[str, ...] = ()
+    reasons_es: tuple[str, ...] = ()
 
     result: ClassVar[str] = "capability_unverified"
     allows_progress: ClassVar[bool] = True

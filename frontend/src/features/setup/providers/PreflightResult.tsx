@@ -21,7 +21,14 @@ type AffectedFeature = components["schemas"]["AffectedFeatureModel"];
  */
 export type PreflightView =
   | { kind: "verified"; message: string; embeddingDim: number | null }
-  | { kind: "capability_unverified"; message: string; affected: AffectedFeature[]; acknowledged: boolean }
+  | {
+      kind: "capability_unverified";
+      message: string;
+      affected: AffectedFeature[];
+      /** WHY it was not trusted, observed in the preflight (FR-007.3). */
+      reasons: string[];
+      acknowledged: boolean;
+    }
   | { kind: "credential_rejected"; message: string; consoleUrl: string | null }
   | { kind: "quota_exceeded"; message: string }
   | { kind: "provider_unreachable"; message: string };
@@ -60,6 +67,7 @@ export function viewOfConfiguration(configuration: Configuration): PreflightView
       kind: "capability_unverified",
       message: preflight.message,
       affected: preflight.affected_features ?? [],
+      reasons: preflight.degradation_reasons ?? [],
       acknowledged: configuration.degradation_acknowledged_at != null,
     };
   }
@@ -116,6 +124,24 @@ export function PreflightResult({
               <li key={feature.code}>{feature.message}</li>
             ))}
           </ul>
+
+          {/*
+            FR-007.3 asks for the affected functions «y por qué». The list above
+            is the consequence; this one is the observation that produced it.
+            Without it the acknowledgement is given blind: a model that invented
+            a phone number and a model that answered malformed JSON look
+            identical on screen, and they call for different decisions.
+          */}
+          {view.reasons.length > 0 && (
+            <>
+              <p className="mt-3">Por qué no lo dimos por verificado:</p>
+              <ul className="mt-1 list-disc space-y-1 pl-6">
+                {view.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </>
+          )}
 
           {view.acknowledged ? (
             <p className="mt-3 text-muted-foreground">

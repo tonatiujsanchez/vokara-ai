@@ -41,6 +41,7 @@ function configuration(overrides: Partial<Configuration["preflight"]>): Configur
       message: MESSAGES.verified,
       embedding_dim: null,
       affected_features: [],
+      degradation_reasons: [],
       ...overrides,
     },
   };
@@ -54,6 +55,7 @@ const VIEWS: PreflightView[] = [
     affected: [
       { code: "SEMANTIC_MATCHING", message: "El matching semántico quedaría desactivado." },
     ],
+    reasons: [],
     acknowledged: false,
   },
   { kind: "credential_rejected", message: MESSAGES.rejected, consoleUrl: null },
@@ -122,6 +124,7 @@ describe("acuse específico de degradación (FR-007.3, SC-016)", () => {
       { code: "SEMANTIC_MATCHING", message: "El matching semántico quedaría desactivado." },
       { code: "CV_PARSING", message: "Sembrar tu perfil desde el CV puede fallar." },
     ],
+    reasons: ["El CV no trae teléfono: el campo debe quedar en null."],
     acknowledged: false,
   };
 
@@ -130,6 +133,23 @@ describe("acuse específico de degradación (FR-007.3, SC-016)", () => {
 
     expect(screen.getByText(/El matching semántico quedaría desactivado/)).toBeInTheDocument();
     expect(screen.getByText(/Sembrar tu perfil desde el CV puede fallar/)).toBeInTheDocument();
+  });
+
+  it("dice POR QUÉ no se verificó, no solo qué se pierde (FR-007.3)", () => {
+    // «No podrás sembrar tu perfil» sin «inventó un teléfono» es informar a
+    // medias: el candidato no puede distinguir un modelo que inventa de uno que
+    // respondió mal, y son decisiones distintas.
+    render(<PreflightResult view={degraded} />);
+
+    expect(screen.getByText(/Por qué no lo dimos por verificado/)).toBeInTheDocument();
+    expect(screen.getByText(/El CV no trae teléfono/)).toBeInTheDocument();
+  });
+
+  it("no inventa un encabezado de motivos cuando el backend no mandó ninguno", () => {
+    render(<PreflightResult view={{ ...degraded, reasons: [] }} />);
+
+    expect(screen.queryByText(/Por qué no lo dimos por verificado/)).not.toBeInTheDocument();
+    expect(screen.getByText(/El matching semántico quedaría desactivado/)).toBeInTheDocument();
   });
 
   it("ofrece cambiar de proveedor además de aceptar la degradación", () => {

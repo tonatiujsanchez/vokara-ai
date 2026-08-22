@@ -869,6 +869,18 @@ components:
             `capability_unverified`: enumerarlas ANTES de permitir continuar es
             lo que distingue la degradación explícita de la silenciosa.
           items: { $ref: '#/components/schemas/AffectedFeature' }
+        degradation_reasons:
+          type: array
+          description: |
+            POR QUÉ no se dio por verificada la capacidad, observado en el
+            preflight: qué campo inventó el modelo, o que la respuesta no traía
+            la estructura pedida. FR-007.3 pide enumerar las funciones afectadas
+            «Y POR QUÉ»; `affected_features` responde lo primero y esto lo
+            segundo. Sin esto el acuse se da a ciegas: el candidato no puede
+            distinguir un modelo que inventa de uno que no respondió bien, y son
+            decisiones distintas (cambiar de modelo, o reintentar).
+            NUNCA una traza técnica ni el texto crudo del proveedor (SC-013).
+          items: { type: string }
 
     ProviderConfiguration:
       type: object

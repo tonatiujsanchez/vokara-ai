@@ -111,6 +111,10 @@ class PreflightView:
     message_es: str
     embedding_dim: int | None = None
     affected: tuple[AffectedFeature, ...] = ()
+    # WHAT is lost is `affected`; WHY it is not trusted is this. Two fields
+    # because they answer two questions, and the acknowledgement of FR-007.3 is
+    # only informed if the candidate saw both.
+    reasons_es: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -270,6 +274,7 @@ def configure_capability(
             result=attempt.result,
             credential_fingerprint=digest,
             embedding_dim=getattr(attempt, "embedding_dim", None),
+            degradation_reasons=getattr(attempt, "reasons_es", ()),
         )
         view = _view_of(
             capability=capability,
@@ -278,6 +283,7 @@ def configure_capability(
             result=row.preflight_result,
             checked_at=row.preflight_at,
             embedding_dim=row.embedding_dim,
+            reasons_es=tuple(row.degradation_reasons),
             degradation_acknowledged_at=row.degradation_acknowledged_at,
             credential_matches=True,
             notice=_shadow_notice(chosen, resolved),
@@ -314,11 +320,12 @@ def current_configuration(
             row.preflight_result,
             row.preflight_at,
             row.embedding_dim,
+            tuple(row.degradation_reasons),
             row.degradation_acknowledged_at,
             row.credential_fingerprint,
         )
 
-    provider, model, result, checked_at, dim, acknowledged_at, digest = stored
+    provider, model, result, checked_at, dim, reasons, acknowledged_at, digest = stored
     return _view_of(
         capability=capability,
         provider=provider,
@@ -326,6 +333,7 @@ def current_configuration(
         result=result,
         checked_at=checked_at,
         embedding_dim=dim,
+        reasons_es=reasons,
         degradation_acknowledged_at=acknowledged_at,
         credential_matches=_credential_still_matches(provider, capability, digest, resolved),
     )
@@ -390,6 +398,7 @@ def _view_of(
     embedding_dim: int | None,
     degradation_acknowledged_at: datetime | None,
     credential_matches: bool,
+    reasons_es: tuple[str, ...] = (),
     notice: str | None = None,
 ) -> ProviderConfigurationView:
     facts = ProviderFacts(
@@ -410,6 +419,7 @@ def _view_of(
             message_es=_message_for_result(result, capability),
             embedding_dim=embedding_dim,
             affected=affected_features(capability) if result == CapabilityUnverified.result else (),
+            reasons_es=reasons_es,
         ),
         degradation_acknowledged_at=degradation_acknowledged_at,
         is_usable=facts.is_usable,

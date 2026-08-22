@@ -472,6 +472,11 @@ export interface components {
              */
             checked_at: string;
             /**
+             * Degradation Reasons
+             * @description POR QUÉ no se dio por verificada la capacidad, en español y observado en el preflight: qué campo inventó el modelo, o que la respuesta no tenía la estructura pedida. FR-007.3 exige enumerar las funciones afectadas «y por qué»; `affected_features` es lo primero y esto lo segundo. NUNCA una traza técnica ni el texto crudo del proveedor.
+             */
+            degradation_reasons?: string[];
+            /**
              * Embedding Dim
              * @description Dimensión verificada del vector; presente cuando `embeddings` quedó verificado.
              */

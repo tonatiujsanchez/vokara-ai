@@ -181,3 +181,21 @@ def configure(offerable_provider: str) -> ConfigureCapability:
         assert response.status_code in {200, 400, 429, 503}, response.text
 
     return run
+
+
+def alembic_head() -> str:
+    """The newest revision Alembic knows about, read rather than hardcoded.
+
+    Pinning the literal made every migration break two unrelated tests, which
+    teaches the wrong reflex: the property worth asserting is «the database is
+    at head», not «the head is 0001».
+    """
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    backend_root = Path(__file__).resolve().parents[2]
+    config = Config(str(backend_root / "alembic.ini"))
+    # Absolute: `script_location` in the ini is relative to the working
+    # directory, and pytest does not guarantee which one that is.
+    config.set_main_option("script_location", str(backend_root / "app" / "db" / "migrations"))
+    return ScriptDirectory.from_config(config).get_current_head() or ""

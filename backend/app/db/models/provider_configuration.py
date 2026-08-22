@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -46,6 +47,13 @@ class ProviderConfiguration(Base):
     credential_fingerprint: Mapped[str] = mapped_column(sa.Text())
 
     embedding_dim: Mapped[int | None] = mapped_column(sa.Integer(), nullable=True)
+    # WHY the capability was not trusted, beside WHAT it costs. The second is
+    # derivable from the capability; the first is only knowable at probe time,
+    # so it is stored (FR-007.3, SC-016).
+    degradation_reasons: Mapped[list[str]] = mapped_column(
+        postgresql.ARRAY(sa.Text()),
+        server_default="{}",
+    )
     degradation_acknowledged_at: Mapped[datetime | None] = mapped_column(
         sa.TIMESTAMP(timezone=True),
         nullable=True,

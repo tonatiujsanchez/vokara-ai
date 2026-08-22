@@ -373,7 +373,7 @@ class GoogleStructuredOutput:
             return CapabilityUnverified(
                 capability=self.capability,
                 model=self._model,
-                affected_features_es=tuple(failure.description_es for failure in invented),
+                reasons_es=tuple(failure.description_es for failure in invented),
             )
 
         return Verified(capability=self.capability, model=self._model)
@@ -454,7 +454,7 @@ class GoogleEmbeddings:
             return CapabilityUnverified(
                 capability=self.capability,
                 model=self._model,
-                affected_features_es=("El proveedor no devolvió ningún vector.",),
+                reasons_es=("El proveedor no devolvió ningún vector.",),
             )
 
         return Verified(
@@ -481,9 +481,7 @@ def _as_attempt(error: ProviderCallError, *, capability: Capability) -> Prefligh
             return CapabilityUnverified(
                 capability=capability,
                 model=error.model,
-                affected_features_es=(
-                    "El modelo no devolvió una respuesta con la estructura requerida.",
-                ),
+                reasons_es=("El modelo no devolvió una respuesta con la estructura requerida.",),
             )
         case ProviderFailure.UNREACHABLE:
             return ProviderUnreachable(capability=capability, model=error.model)

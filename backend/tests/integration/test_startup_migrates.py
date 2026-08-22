@@ -18,6 +18,8 @@ import pytest
 import yaml
 from sqlalchemy import create_engine, text
 
+from tests.integration.conftest import alembic_head
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_ROOT = REPO_ROOT / "backend"
 ENTRYPOINT = REPO_ROOT / "infra" / "docker" / "entrypoint.sh"
@@ -77,7 +79,7 @@ def test_entrypoint_brings_a_fresh_database_to_head(clean_database_url: str) -> 
         ).scalar_one()
     engine.dispose()
 
-    assert revision == "0001"
+    assert revision == alembic_head()
     assert tables == 10  # nine tables plus alembic_version
     assert seeded == 1
     assert extension == 1

@@ -46,6 +46,7 @@ class ProviderConfigurationRepository(CandidateScopedRepository[ProviderConfigur
         result: str,
         credential_fingerprint: str,
         embedding_dim: int | None = None,
+        degradation_reasons: tuple[str, ...] = (),
         at: datetime | None = None,
     ) -> ProviderConfiguration:
         """Record the outcome of a preflight, replacing whatever was there.
@@ -71,6 +72,7 @@ class ProviderConfigurationRepository(CandidateScopedRepository[ProviderConfigur
                     preflight_at=at or now,
                     credential_fingerprint=credential_fingerprint,
                     embedding_dim=embedding_dim,
+                    degradation_reasons=list(degradation_reasons),
                 ),
             )
 
@@ -80,6 +82,10 @@ class ProviderConfigurationRepository(CandidateScopedRepository[ProviderConfigur
         row.preflight_at = at or now
         row.credential_fingerprint = credential_fingerprint
         row.embedding_dim = embedding_dim
+        # Overwritten, never merged: these reasons describe this preflight, and
+        # keeping a previous run's would attribute to this model a failure of
+        # another one.
+        row.degradation_reasons = list(degradation_reasons)
         row.degradation_acknowledged_at = None
         row.updated_at = now
         self.session.flush()

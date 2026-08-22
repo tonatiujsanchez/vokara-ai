@@ -248,8 +248,8 @@ async def test_a_provider_that_invents_values_is_not_verified() -> None:
     outcome = await adapter.probe()
 
     assert isinstance(outcome, CapabilityUnverified)
-    assert len(outcome.affected_features_es) == 2
-    assert all(reason.endswith(".") for reason in outcome.affected_features_es)
+    assert len(outcome.reasons_es) == 2
+    assert all(reason.endswith(".") for reason in outcome.reasons_es)
 
 
 async def test_an_honest_answer_verifies_the_generation_capability() -> None:
