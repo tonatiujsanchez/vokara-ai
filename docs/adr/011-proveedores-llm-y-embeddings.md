@@ -118,7 +118,7 @@ sustento, que es lo que el artículo IV existe para impedir—.
 
 | Proveedor | Modelo de generación | Salida estructurada | Respeta `null` en opcionales | Embeddings | Dimensión | Verificado (fecha) |
 |---|---|---|---|---|---|---|
-| google | `gemini-3.5-flash-lite` | Sí | Sí | OK | 768 | 2026-08-11 |
+| google | `gemini-3.5-flash-lite` | Sí | Sí | OK | 768 | 2026-08-21 |
 | OpenAI | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente |
 | Anthropic | pendiente | pendiente | pendiente | **No ofrece** | n/a | pendiente |
 | DeepSeek | pendiente | pendiente | pendiente | pendiente | pendiente | pendiente |
@@ -127,7 +127,35 @@ sustento, que es lo que el artículo IV existe para impedir—.
 Un proveedor con verificación "pendiente" **no se anuncia como soportado en la
 UI ni en el README**: aparece cuando su fila está completa.
 
-### Notas de la verificación de Google (2026-08-11)
+### Re-verificación del 2026-08-21: la prueba no era la del producto
+
+La corrida del 2026-08-11 fue real y pasó, pero **no era la prueba que el
+producto corre**, y una fila solo vale lo que vale la prueba que la respalda.
+Tres divergencias, encontradas al investigar un preflight que reprobaba con una
+llave válida:
+
+- El esquema del preflight declaraba `company`, `role` e `institution`
+  **opcionales**, mientras el del script los exigía. Dos de las cinco
+  comprobaciones buscan el segundo empleo por el nombre de la empresa, así que
+  un modelo que devolviera `company=null` producía una lista vacía y **ambas
+  comprobaciones pasaban en el vacío**: el preflight afirmaba «respeta null»
+  sobre un empleo que nunca encontró.
+- El script mandaba la REGLA CRÍTICA como **instrucción de sistema**; el
+  preflight la concatenaba en el mensaje de usuario. La regla que produce los
+  `null` viajaba degradada a contenido ordinario justo en la prueba que mide los
+  `null`.
+- El texto del prompt y del CV de muestra diferían en los acentos.
+
+Las tres se corrigieron **igualando el producto y el script**, y el prompt del
+preflight pasó a `preflight_v2`. La corrida del 2026-08-21 es la primera en la
+que ambos ejecutan la misma prueba. **El veredicto no cambió**: `gemini-3.5-flash-lite`
+respeta los cinco huecos, latencia 2.1 s, embeddings 768. Por eso la fila
+conserva su contenido y solo avanza de fecha.
+
+Lo que sí cambió es qué se puede afirmar con ella: hasta hoy certificaba una
+prueba que la aplicación no reproducía.
+
+### Notas de la verificación de Google (2026-08-11, vigentes)
 
 - **Método.** Esquema Pydantic anidado con campos opcionales, aplicado sobre un
   CV deliberadamente incompleto: sin teléfono, sin años de experiencia

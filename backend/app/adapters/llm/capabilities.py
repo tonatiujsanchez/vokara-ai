@@ -64,10 +64,15 @@ class ProviderCapabilities:
     verified_on: date | None
 
 
-# Verified on 2026-08-11 with scripts/verify_providers.py: nested schema with
-# optional fields over a deliberately incomplete CV, `null` respected in every
-# absent field, 1.54 s observed latency, embeddings truncated with MRL to 768.
-_GOOGLE_VERIFIED_ON = date(2026, 8, 11)
+# Re-verified on 2026-08-21 with scripts/verify_providers.py, after the script
+# and the product preflight were made to run the SAME test: identical schema,
+# identical prompt sent as a system instruction, identical criterion. The
+# 2026-08-11 run had certified a test that differed from the one the app ran, so
+# the date advances on the strength of the aligned run — the verdict did not
+# change (`null` respected in all five holes, 2.1 s, embeddings MRL-truncated to
+# 768). The model is `settings.google_model`; a different one of the same
+# provider is NOT covered by this row (see ADR-011, «Decisión diferida»).
+_GOOGLE_VERIFIED_ON = date(2026, 8, 21)
 
 CAPABILITY_MATRIX: tuple[ProviderCapabilities, ...] = (
     ProviderCapabilities(

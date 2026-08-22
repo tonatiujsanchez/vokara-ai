@@ -72,7 +72,7 @@ def test_google_is_the_only_row_verified_and_it_carries_its_date() -> None:
     assert [row.provider for row in verified] == [ProviderId.GOOGLE]
 
     row = capabilities_of(ProviderId.GOOGLE)
-    assert row.verified_on == date(2026, 8, 11)
+    assert row.verified_on == date(2026, 8, 21)
     assert row.structured_output is True
     assert row.respects_null_in_optionals is True
     assert row.embeddings is True
